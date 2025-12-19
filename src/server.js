@@ -7,6 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import { Vesper } from './vesper.js';
 import { Mei } from './mei.js';
+import { getAgent } from './agent.js';
 import { createTaskContext, BusOps, getTaskTranscript } from './bus.js';
 import * as Billing from './billing.js';
 
@@ -96,14 +97,8 @@ app.post('/api/chat', async (req, res) => {
                 respondingAgent = intent.agentId;
                 chat.currentAgent = intent.agentId;
 
-                if (intent.agentId === 'mei') {
-                    response = await mei.process(message);
-                } else {
-                    // For now, Mei handles delegation to other agents
-                    const delegationMessage = `I'm routing your request to ${intent.agent.name}. Let me process this...\n\n`;
-                    response = delegationMessage + await mei.process(message);
-                    respondingAgent = 'mei';
-                }
+                const agent = getAgent(intent.agentId);
+                response = await agent.process(message);
 
                 // Emit bus event for routing
                 BusOps.ASSERT('vesper', chat.taskId, `Routed to ${intent.agentId}: "${message}"`);
@@ -116,8 +111,9 @@ app.post('/api/chat', async (req, res) => {
             response = await mei.process(message);
             BusOps.ASSERT('mei', chat.taskId, `Processing request: "${message}"`);
         } else {
-            // Other agent - route through Mei for now
-            response = await mei.process(message);
+            // Load the specific agent dynamically
+            const agent = getAgent(chat.currentAgent);
+            response = await agent.process(message);
             BusOps.ASSERT(chat.currentAgent, chat.taskId, `Processing: "${message}"`);
         }
 

@@ -1,95 +1,163 @@
 /**
- * Base Agent Class
- * All specialist agents inherit from this.
- * Agents are not "smarter" than each other — they just have different permissions and prompts.
+ * Generic Agent Class
+ * Loads any agent from JSON profiles and handles LLM chat
  */
 
-import { chat } from './llm.js';
-import { BusOps, getTaskContext } from './bus.js';
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { chat, isLlmAvailable } from './llm.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ROOT = join(__dirname, '..');
+const AGENTS_DIR = join(ROOT, 'agents');
+
+/**
+ * Load agent profile from JSON files
+ */
+function loadAgentProfile(agentId) {
+    const profile = {
+        agent: null,
+        personality: null,
+        user: null
+    };
+
+    try {
+        const agentPath = join(AGENTS_DIR, `${agentId}.agent.json`);
+        if (existsSync(agentPath)) {
+            profile.agent = JSON.parse(readFileSync(agentPath, 'utf-8'));
+        }
+    } catch (err) { }
+
+    try {
+        const personalityPath = join(AGENTS_DIR, `${agentId}.personality.json`);
+        if (existsSync(personalityPath)) {
+            profile.personality = JSON.parse(readFileSync(personalityPath, 'utf-8'));
+        }
+    } catch (err) { }
+
+    try {
+        const userPath = join(AGENTS_DIR, `${agentId}.user.json`);
+        if (existsSync(userPath)) {
+            profile.user = JSON.parse(readFileSync(userPath, 'utf-8'));
+        }
+    } catch (err) { }
+
+    return profile;
+}
+
+/**
+ * Build system prompt from profile data
+ */
+function buildSystemPrompt(profile) {
+    const agent = profile.agent;
+    const personality = profile.personality;
+
+    if (!agent || !personality) {
+        return 'You are a helpful assistant at DeepFish AI Studio.';
+    }
+
+    const name = agent.identity?.name || 'Agent';
+    const title = agent.identity?.title || 'Team Member';
+    const tagline = agent.identity?.tagline || '';
+
+    const backstory = personality.backstory?.philosophy || personality.backstory?.origin || '';
+    const style = personality.personality?.style || '';
+    const voice = personality.personality?.voice || '';
+    const tone = personality.personality?.tone || '';
+
+    const primeAlways = personality.primeDirective?.always || [];
+    const primeNever = personality.primeDirective?.never || [];
+
+    const expertise = personality.expertise?.primary?.map(e =>
+        typeof e === 'string' ? e : e.domain
+    ).join(', ') || '';
+
+    let prompt = `You are ${name}, ${title} at DeepFish AI Studio.`;
+
+    if (tagline) {
+        prompt += ` You are "${tagline}".`;
+    }
+
+    prompt += `\n\nYour personality:\n`;
+    if (style) prompt += `- ${style}\n`;
+    if (voice) prompt += `- ${voice}\n`;
+    if (tone) prompt += `- Tone: ${tone}\n`;
+
+    if (backstory) {
+        prompt += `\nPhilosophy: ${backstory}\n`;
+    }
+
+    if (expertise) {
+        prompt += `\nExpertise: ${expertise}\n`;
+    }
+
+    if (primeAlways.length > 0) {
+        prompt += `\nAlways:\n`;
+        primeAlways.forEach(p => prompt += `- ${p}\n`);
+    }
+
+    if (primeNever.length > 0) {
+        prompt += `\nNever:\n`;
+        primeNever.forEach(p => prompt += `- ${p}\n`);
+    }
+
+    return prompt;
+}
+
+// Cache for loaded agents
+const agentCache = new Map();
 
 export class Agent {
-    constructor(config) {
-        this.id = config.id;
-        this.name = config.name;
-        this.role = config.role || 'manager';
-        this.primitive = config.primitive || 'General';
-        this.systemPrompt = config.systemPrompt || this.defaultSystemPrompt();
-        this.busAccess = config.busAccess !== false;
-
-        // Extended config from JSON
-        this.model = config.model || null;
-        this.tools = config.tools || null;
-        this.bus = config.bus || null;
-        this.skinId = config.skinId || 'classic';
-    }
-
-    defaultSystemPrompt() {
-        return `You are ${this.name}, a specialist agent in the DeepFish Virtual Office.
-Your area of expertise: ${this.primitive}
-
-When working:
-- Stay focused on your specialty
-- Be concise and professional
-- If something is outside your expertise, say so
-- Always acknowledge what you understand before proceeding`;
+    constructor(agentId) {
+        this.agentId = agentId;
+        this.profile = loadAgentProfile(agentId);
+        this.systemPrompt = buildSystemPrompt(this.profile);
+        this.name = this.profile.agent?.identity?.name || agentId;
+        this.title = this.profile.agent?.identity?.title || 'Agent';
+        this.llmAvailable = isLlmAvailable();
     }
 
     /**
-     * Process a task
+     * Process user input and return response
      */
-    async process(taskId, input) {
-        const context = getTaskContext(taskId);
-        if (!context) {
-            throw new Error(`Task ${taskId} not found`);
+    async process(input) {
+        if (this.llmAvailable) {
+            try {
+                const response = await chat(this.systemPrompt, input, {
+                    maxTokens: 512
+                });
+                return response;
+            } catch (err) {
+                console.error(`[${this.name}] LLM error:`, err.message);
+                return this.mockResponse(input);
+            }
         }
-
-        // Step 1: ASSERT understanding on bus
-        if (this.busAccess) {
-            BusOps.ASSERT(this.id, taskId, `I understand the task as: ${input.substring(0, 100)}...`);
-        }
-
-        // Step 2: Do the actual work via LLM
-        const response = await chat(this.systemPrompt, input, {
-            maxTokens: 1024
-        });
-
-        // Step 3: Return result (Mei will handle validation)
-        return {
-            agentId: this.id,
-            agentName: this.name,
-            taskId,
-            result: response,
-            timestamp: new Date().toISOString()
-        };
+        return this.mockResponse(input);
     }
 
-    /**
-     * Acknowledge a message from another agent
-     */
-    acknowledge(taskId, messageTimestamp) {
-        if (this.busAccess) {
-            return BusOps.ACK(this.id, taskId, messageTimestamp);
-        }
-        return null;
+    mockResponse(input) {
+        return `Hi! I'm ${this.name}, ${this.title}. I received your message: "${input}"\n\n(LLM is not available - this is a mock response)`;
+    }
+}
+
+/**
+ * Get or create an agent instance (cached)
+ */
+export function getAgent(agentId) {
+    if (agentCache.has(agentId)) {
+        return agentCache.get(agentId);
     }
 
-    /**
-     * Query another agent
-     */
-    query(taskId, question, targetAgents = []) {
-        if (this.busAccess) {
-            return BusOps.QUERY(this.id, taskId, question, targetAgents);
-        }
-        return null;
-    }
+    const agent = new Agent(agentId);
+    agentCache.set(agentId, agent);
+    return agent;
+}
 
-    /**
-     * Correct another agent's work
-     */
-    correct(taskId, correction, targetAgent) {
-        if (this.busAccess) {
-            return BusOps.CORRECT(this.id, taskId, correction, targetAgent);
-        }
-        return null;
-    }
+/**
+ * List all available agent IDs
+ */
+export function listAgentIds() {
+    return ['vesper', 'mei', 'hanna', 'it', 'sally', 'oracle'];
 }

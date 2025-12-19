@@ -350,6 +350,8 @@
     border-radius: var(--radius-lg);
     font-size: var(--font-size-sm);
     line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .workspace-chat__message--user .workspace-chat__message-content {

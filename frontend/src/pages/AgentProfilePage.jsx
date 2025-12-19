@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { getAgent } from '../data/agents'
 import SkillPicker from '../components/SkillPicker'
+import { trainingApi } from '../services/training'
 
 // Full LLM Model Catalog - The agent's BRAIN (not skills, not modules)
 // In production, this would come from llm-resolver.js / llm_catalog.json
@@ -41,8 +42,24 @@ function AgentProfilePage() {
     const [voiceName, setVoiceName] = useState(getDefaultVoice(agentId))
     const [learnedFacts, setLearnedFacts] = useState([])
     const [isDragOver, setIsDragOver] = useState(false)
+    const [isUploading, setIsUploading] = useState(false)
     const [selectedLlmSkill, setSelectedLlmSkill] = useState(null)
     const [userTier] = useState('platinum') // In production, get from user context
+
+    // Load facts from backend on mount
+    useEffect(() => {
+        if (agentId) {
+            trainingApi.getFacts(agentId)
+                .then(data => {
+                    // Filter out template entries
+                    const realFacts = (data.facts || []).filter(f =>
+                        f.fact && !f.fact.startsWith('$')
+                    )
+                    setLearnedFacts(realFacts)
+                })
+                .catch(err => console.error('Failed to load facts:', err))
+        }
+    }, [agentId])
 
     // Scroll to section if hash in URL (e.g., #llm, #voice)
     useEffect(() => {
@@ -69,23 +86,37 @@ function AgentProfilePage() {
         )
     }
 
-    const handleDrop = useCallback((e) => {
+    const handleDrop = useCallback(async (e) => {
         e.preventDefault()
         setIsDragOver(false)
+        setIsUploading(true)
 
         const files = Array.from(e.dataTransfer.files)
-        files.forEach(file => {
-            const newFact = {
-                id: Date.now() + Math.random(),
-                source: file.type.includes('pdf') ? 'pdf' :
-                    file.type.includes('image') ? 'image' : 'text',
-                sourceFile: file.name,
-                fact: `Extracted knowledge from ${file.name}`,
-                extractedAt: new Date().toISOString(),
+
+        for (const file of files) {
+            try {
+                // Read file contents
+                const text = await trainingApi.readFileAsText(file)
+
+                // Send to backend
+                const result = await trainingApi.addFacts(
+                    agentId,
+                    text,
+                    file.type.includes('pdf') ? 'pdf' : 'text',
+                    file.name
+                )
+
+                // Update local state with new facts
+                if (result.facts) {
+                    setLearnedFacts(prev => [...prev, ...result.facts])
+                }
+            } catch (err) {
+                console.error(`Failed to process ${file.name}:`, err)
             }
-            setLearnedFacts(prev => [...prev, newFact])
-        })
-    }, [])
+        }
+
+        setIsUploading(false)
+    }, [agentId])
 
     const handleDragOver = useCallback((e) => {
         e.preventDefault()
@@ -96,8 +127,13 @@ function AgentProfilePage() {
         setIsDragOver(false)
     }, [])
 
-    const deleteFact = (factId) => {
-        setLearnedFacts(prev => prev.filter(f => f.id !== factId))
+    const deleteFact = async (factId) => {
+        try {
+            await trainingApi.deleteFact(agentId, factId)
+            setLearnedFacts(prev => prev.filter(f => f.id !== factId))
+        } catch (err) {
+            console.error('Failed to delete fact:', err)
+        }
     }
 
     return (

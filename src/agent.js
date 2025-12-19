@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { chat, isLlmAvailable } from './llm.js';
+import { getFactsForPrompt } from './memory.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -121,11 +122,16 @@ export class Agent {
 
     /**
      * Process user input and return response
+     * Injects learned facts into the system prompt
      */
     async process(input) {
         if (this.llmAvailable) {
             try {
-                const response = await chat(this.systemPrompt, input, {
+                // Inject learned facts into the prompt
+                const factsSection = getFactsForPrompt(this.agentId, input);
+                const fullPrompt = this.systemPrompt + factsSection;
+
+                const response = await chat(fullPrompt, input, {
                     maxTokens: 512
                 });
                 return response;

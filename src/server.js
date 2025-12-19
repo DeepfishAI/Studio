@@ -10,6 +10,7 @@ import { Mei } from './mei.js';
 import { getAgent } from './agent.js';
 import { createTaskContext, BusOps, getTaskTranscript } from './bus.js';
 import * as Billing from './billing.js';
+import * as Memory from './memory.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -403,10 +404,125 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
     }
 });
 
+// ============================================
+// TRAINING & MEMORY ROUTES
+// ============================================
+
+/**
+ * Get learned facts for an agent
+ * GET /api/training/:agentId/facts
+ */
+app.get('/api/training/:agentId/facts', (req, res) => {
+    const { agentId } = req.params;
+    const facts = Memory.getFacts(agentId);
+    res.json({ facts, count: facts.length });
+});
+
+/**
+ * Add facts from uploaded text
+ * POST /api/training/:agentId/facts
+ * Body: { text, source?, sourceFile? }
+ */
+app.post('/api/training/:agentId/facts', (req, res) => {
+    try {
+        const { agentId } = req.params;
+        const { text, source = 'upload', sourceFile = 'manual-input' } = req.body;
+
+        if (!text) {
+            return res.status(400).json({ error: 'text is required' });
+        }
+
+        // Extract facts from text
+        const extractedFacts = Memory.extractFactsFromText(text);
+
+        if (extractedFacts.length === 0) {
+            return res.status(400).json({ error: 'No facts could be extracted from text' });
+        }
+
+        // Add facts to agent
+        const addedFacts = Memory.addFacts(agentId, extractedFacts, source, sourceFile);
+
+        res.json({
+            success: true,
+            factsAdded: addedFacts.length,
+            facts: addedFacts
+        });
+
+    } catch (error) {
+        console.error('[Training] Add facts error:', error);
+        res.status(500).json({ error: 'Failed to add facts', details: error.message });
+    }
+});
+
+/**
+ * Delete a fact
+ * DELETE /api/training/:agentId/facts/:factId
+ */
+app.delete('/api/training/:agentId/facts/:factId', (req, res) => {
+    const { agentId, factId } = req.params;
+    const success = Memory.deleteFact(agentId, factId);
+
+    if (success) {
+        res.json({ success: true });
+    } else {
+        res.status(404).json({ error: 'Fact not found' });
+    }
+});
+
+/**
+ * Clear all facts for an agent
+ * DELETE /api/training/:agentId/facts
+ */
+app.delete('/api/training/:agentId/facts', (req, res) => {
+    const { agentId } = req.params;
+    const success = Memory.clearFacts(agentId);
+    res.json({ success });
+});
+
+/**
+ * Get memory entries for an agent
+ * GET /api/memory/:agentId
+ */
+app.get('/api/memory/:agentId', (req, res) => {
+    const { agentId } = req.params;
+    const entries = Memory.getMemory(agentId);
+    res.json({ entries, count: entries.length });
+});
+
+/**
+ * Add a memory entry
+ * POST /api/memory/:agentId
+ * Body: { content, type? }
+ */
+app.post('/api/memory/:agentId', (req, res) => {
+    try {
+        const { agentId } = req.params;
+        const { content, type = 'conversation' } = req.body;
+
+        if (!content) {
+            return res.status(400).json({ error: 'content is required' });
+        }
+
+        const entry = Memory.addMemory(agentId, content, type);
+
+        if (entry) {
+            res.json({ success: true, entry });
+        } else {
+            res.status(500).json({ error: 'Failed to add memory' });
+        }
+
+    } catch (error) {
+        console.error('[Memory] Add memory error:', error);
+        res.status(500).json({ error: 'Failed to add memory', details: error.message });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`🐟 DeepFish API Server running on http://localhost:${PORT}`);
     console.log(`📞 Vesper is ready to take calls`);
     console.log(`📋 Mei is ready to manage projects`);
     console.log(`💳 Billing: ${Billing.isBillingEnabled() ? 'ENABLED' : 'DISABLED (configure Stripe keys)'}`);
+    console.log(`🧠 Memory: ENABLED`);
 });
+

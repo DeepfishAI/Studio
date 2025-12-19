@@ -146,15 +146,25 @@ function WorkspacePage() {
 
     return (
         <div className="workspace-page">
-            {/* Left: Chat Panel */}
-            <div className="workspace-panel workspace-panel--chat">
+            {/* Left: Files & Assets */}
+            <div className="workspace-panel workspace-panel--files">
                 <div className="workspace-panel__header">
-                    <h3>💬 Agent Chat</h3>
+                    <h3>📁 Files</h3>
                 </div>
-                <WorkspaceChat
-                    onApplyCode={handleApplyCode}
-                    currentFile={activeFile}
-                    currentContent={currentContent}
+                <FileTree
+                    files={Object.keys(project.files)}
+                    activeFile={activeFile}
+                    onSelectFile={handleOpenFile}
+                    onCreateFile={handleCreateFile}
+                    onDeleteFile={handleDeleteFile}
+                />
+
+                <div className="workspace-panel__header" style={{ marginTop: 'var(--space-lg)' }}>
+                    <h3>📤 Assets</h3>
+                </div>
+                <AssetUploader
+                    assets={project.assets}
+                    onAddAsset={handleAddAsset}
                 />
             </div>
 
@@ -212,25 +222,15 @@ function WorkspacePage() {
                 )}
             </div>
 
-            {/* Right: Files & Assets */}
-            <div className="workspace-panel workspace-panel--files">
+            {/* Right: Chat Panel (like VSCode) */}
+            <div className="workspace-panel workspace-panel--chat">
                 <div className="workspace-panel__header">
-                    <h3>📁 Files</h3>
+                    <h3>💬 Agent Chat</h3>
                 </div>
-                <FileTree
-                    files={Object.keys(project.files)}
-                    activeFile={activeFile}
-                    onSelectFile={handleOpenFile}
-                    onCreateFile={handleCreateFile}
-                    onDeleteFile={handleDeleteFile}
-                />
-
-                <div className="workspace-panel__header" style={{ marginTop: 'var(--space-lg)' }}>
-                    <h3>📤 Assets</h3>
-                </div>
-                <AssetUploader
-                    assets={project.assets}
-                    onAddAsset={handleAddAsset}
+                <WorkspaceChat
+                    onApplyCode={handleApplyCode}
+                    currentFile={activeFile}
+                    currentContent={currentContent}
                 />
             </div>
         </div>

@@ -40,6 +40,11 @@ function LandingPage() {
                     specialists is waiting in the boardroom.
                 </p>
 
+                <p className="landing-feature">
+                    ✨ Includes a built-in coding workspace for testing and tuning — prototype ideas
+                    with your AI team before exporting to production.
+                </p>
+
                 <Link to="/app" className="landing-cta">
                     ENTER STUDIO
                 </Link>

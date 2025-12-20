@@ -1,0 +1,45 @@
+{
+    "$schema": "./agent.schema.json",
+    "schemaVersion": "2.0",
+    "identity": {
+        "id": "_template",
+        "name": "New Agent",
+        "title": "Role Title",
+        "tagline": "A brief description of purpose",
+        "avatar": "/avatars/default.png"
+    },
+    "role": "worker",
+    "busConfig": {
+        "canEmit": [
+            "TASK_COMPLETE",
+            "BLOCKER",
+            "REQUEST_REVIEW"
+        ],
+        "canReceive": [
+            "DISPATCH",
+            "BROADCAST"
+        ],
+        "wakeEvents": [
+            "DISPATCH"
+        ]
+    },
+    "hardware": {
+        "memory": {
+            "type": "redis-vector",
+            "retention": "permanent"
+        },
+        "voice": {
+            "provider": "elevenlabs",
+            "defaultVoiceId": "EXAVITQu4vr4xnSDxMaL"
+        }
+    },
+    "skills": [
+        "basic_chat",
+        "web_search"
+    ],
+    "specialCapabilities": {
+        "callRouting": {
+            "canTransferTo": []
+        }
+    }
+}

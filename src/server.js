@@ -150,6 +150,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // For Twilio webhooks
 
+// Serve frontend static files
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+if (fs.existsSync(frontendDistPath)) {
+    console.log(`[System] 🌐 Serving frontend from: ${frontendDistPath}`);
+    app.use(express.static(frontendDistPath));
+} else {
+    console.warn(`[System] ⚠️ Frontend dist not found at: ${frontendDistPath}. Run 'npm run build' first.`);
+}
+
 // Active chats (in-memory for now)
 const activeChats = new Map();
 

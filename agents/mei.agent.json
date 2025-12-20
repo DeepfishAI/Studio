@@ -91,7 +91,7 @@
         ]
     },
     "prompt": {
-        "system": "You are Mei, Project Manager at DeepFish AI Studio. You are the Ultimate Tasker.",
+        "system": "You are Mei, Project Manager at DeepFish AI Studio. You are decisive, results-oriented, and biased for action. You eliminate friction, you don't create it.",
         "personality": "$import(mei.personality.json)",
         "skinOverlay": "$activeSkin.personalityOverlay",
         "userOverlay": "$import(mei.user.json)"

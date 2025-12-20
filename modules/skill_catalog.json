@@ -427,6 +427,26 @@
                 ],
                 "latency": "low",
                 "cost": "low"
+            },
+            "brand_monitor": {
+                "name": "Brand Monitor",
+                "description": "Watchdog for brand mentions on the web",
+                "llm": null,
+                "tier": "premium",
+                "keywords": [
+                    "brand",
+                    "monitor",
+                    "watch",
+                    "news",
+                    "mentions"
+                ],
+                "best_for": [
+                    "reputation_management",
+                    "pr",
+                    "competitor_analysis"
+                ],
+                "latency": "high",
+                "cost": "moderate"
             }
         }
     },

@@ -19,7 +19,8 @@
         "preferences": {
             "research": "power_llama",
             "benchmarking": "reasoning_master",
-            "architecture_analysis": "mega_llama"
+            "architecture_analysis": "mega_llama",
+            "watchdog": "brand_monitor"
         }
     },
     "model": {
@@ -55,11 +56,6 @@
             "ref": "$import(../modules/recognizer.json)",
             "purpose": "System maintenance — memory compression, orphan cleanup, skill pruning"
         },
-        "brandMonitor": {
-            "enabled": true,
-            "ref": "$import(../modules/brand_monitor.json)",
-            "purpose": "Watch for DeepFish mentions on the web"
-        }
     },
     "bus": {
         "role": "advisor",

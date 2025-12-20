@@ -65,6 +65,11 @@ app.post('/api/chat', async (req, res) => {
     try {
         const { message, agentId, chatId } = req.body;
 
+        // Diagnostic logging
+        const llmStatus = isLlmAvailable();
+        const providers = getAvailableProviders();
+        console.log(`[API /chat] LLM available: ${llmStatus}, providers: ${providers.join(', ') || 'NONE'}`);
+
         if (!message || typeof message !== 'string') {
             return res.status(400).json({ error: 'Message is required' });
         }

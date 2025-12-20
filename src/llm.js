@@ -42,10 +42,18 @@ export async function chat(systemPrompt, userMessage, options = {}) {
     // Try requested provider, fall back to any available
     const providers = [provider, 'anthropic', 'gemini', 'nvidia'];
 
+    console.log(`[LLM] Starting chat. Checking providers in order: ${providers.join(', ')}`);
+
     for (const p of providers) {
-        if (isProviderAvailable(p)) {
+        const available = isProviderAvailable(p);
+        console.log(`[LLM] Provider ${p}: available=${available}`);
+
+        if (available) {
             try {
-                return await chatWithProvider(p, systemPrompt, userMessage, { model, maxTokens });
+                console.log(`[LLM] Attempting call with provider: ${p}`);
+                const result = await chatWithProvider(p, systemPrompt, userMessage, { model, maxTokens });
+                console.log(`[LLM] Success with provider: ${p}`);
+                return result;
             } catch (err) {
                 console.error(`[LLM] ${p} failed:`, err.message);
                 continue;

@@ -90,7 +90,15 @@ export function isElevenLabsEnabled() {
  * Returns audioId that can be used to serve the file
  */
 async function generateElevenLabsAudio(text, agentId) {
-    const voiceId = ELEVENLABS_VOICES[agentId] || ELEVENLABS_VOICES.vesper;
+    // Load agent to get their voice ID
+    const agent = getAgent(agentId);
+    // Try to get voice ID from profile, fallback to Vesper's default (Lily), fallback to whatever
+    let voiceId = agent?.profile?.agent?.tools?.voiceSynthesis?.voiceId;
+
+    // If not found in profile, check the hardcoded list (legacy support)
+    if (!voiceId) {
+        voiceId = ELEVENLABS_VOICES[agentId] || ELEVENLABS_VOICES.vesper;
+    }
 
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',

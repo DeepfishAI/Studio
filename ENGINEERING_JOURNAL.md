@@ -50,7 +50,15 @@ We implemented a Dual-Write strategy in `bus.js`:
 ---
 *End of Session Note: This architecture now supports the "3 Meis" value proposition—parallel compute instances that share state via Redis but execute independently.*
 
-### 6. App Store Readiness (PWA)
+### 8. Frontend Customization Layer
+**Problem:** "View Profile" was broken, and users couldn't customize agents.
+**Fix:**
+- **Navigation:** Fixed broken relative links in `AgentsPage.jsx`.
+- **UI:** Added "Customization" section to `AgentProfilePage` (Nickname, Instructions).
+- **Backend:** Added `POST /api/agents/:id/config` which saves changes to `{agent}.user.json` (The User Overlay).
+- **Persistence:** Customizations now survive restarts and re-injection into the LLM system prompt.
+
+### 9. App Store Readiness (PWA)
 **Goal:** Prepare for Google Play / Microsoft Store distribution.
 **Action:**
 - Created `manifest.json`.

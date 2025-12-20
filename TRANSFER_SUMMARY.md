@@ -267,13 +267,14 @@ Build all features for Platinum, nerf lower tiers with toggles:
 - `98c3683` — fix(frontend): repair dashboard syntax error
 - `3592991` — feat(pwa): add manifest for app store support
 - `ac546aa` — fix(core): wire mei to bus and enable voice events
+- `5486a97` — feat(frontend): add agent customization and fix navigation
 
 ---
 
 ## 🟢 Current Status
 - **Core:** Active, Persistent (Redis), & **WIRED**. Mei now actually dispatches tasks.
 - **Voice:** Active (ElevenLabs + Intelligent Routing).
-- **Frontend:** Active (React + Live Dashboard) + **PWA Ready**.
+- **Frontend:** Active (React + Live Dashboard) + **PWA Ready** + **Customizable**.
 - **Deployment:** Pushed to GitHub `DeepfishAI/Studio`. Railway auto-deploying.
 
 ## 🟡 Immediate Actions for User

@@ -233,3 +233,48 @@ Build all features for Platinum, nerf lower tiers with toggles:
 ---
 
 *Ready for next session. Pick up from "Next Steps" above.*
+
+---
+
+## Session: 2025-12-19/20 — Production Systems & Frontend
+
+### 1. Redis Persistence (The Memory)
+- **Implemented:** `src/bus.js` now syncs with Redis (`ioredis`).
+- **Benefit:** Bus state (tasks, context) survives server restarts. "Amnesia" is cured.
+- **Config:** `REDIS_URL` automatically injected by Railway.
+
+### 2. Intern System ("Costumed Clones")
+- **Refactored:** Interns are no longer separate generic agents.
+- **New Model:** Interns are *clones* of their managers (e.g., specific skin of generic Manager) dispatched for specific tasks.
+- **File:** `src/interns.js` updated to spawn clones.
+
+### 3. Voice Logic ("The Hotline")
+- **Upgraded:** DeepFish now speaks.
+    - **ElevenLabs:** Re-enabled in `src/twilio.js`.
+    - **Vesper:** Now uses `virtual_office.json` intelligence to route calls dynamically.
+    - **Logging:** Every phone call is logged to the Redis Bus (`VOICE_INPUT`, `VOICE_OUTPUT`).
+
+### 4. Frontend ("The Matrix")
+- **New Feature:** Live Operations Dashboard.
+- **Endpoint:** `GET /api/stream` (SSE) added to `src/server.js`.
+- **UI:** `BusFeed.jsx` component visualizes the nervous system of the office.
+- **Repair:** Fixed duplicate tag syntax error in `DashboardPage.jsx`.
+
+### Commits
+- `adc5cc5` — fix(voice): re-enable ElevenLabs and buff Vesper routing
+- `ddcc119` — feat(voice): log calls to redis bus
+- `67e8351` — feat(frontend): add live bus feed dashboard
+- `98c3683` — fix(frontend): repair dashboard syntax error
+
+---
+
+## 🟢 Current Status
+- **Core:** Active & Persistent (Redis).
+- **Voice:** Active (ElevenLabs + Intelligent Routing).
+- **Frontend:** Active (React + Live Bus Feed).
+- **Deployment:** Pushed to GitHub `DeepfishAI/Studio`. Railway auto-deploying.
+
+## 🟡 Immediate Actions for User
+1.  **Railway Config:** Set `ELEVENLABS_API_KEY` in Railway Variables.
+2.  **frontend/ Build:** Verify Railway builds the React app correctly.
+3.  **DNS:** Configure `studio.deepfish.app`.

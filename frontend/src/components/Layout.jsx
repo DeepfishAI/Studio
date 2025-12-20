@@ -11,6 +11,28 @@ function Layout() {
 
     return (
         <div className="app-layout">
+            {/* Beta Warning Banner */}
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 9999,
+                background: 'linear-gradient(90deg, #FFA500 0%, #FF8C00 100%)',
+                color: '#1a1a1a',
+                padding: '8px 24px',
+                fontSize: '13px',
+                fontWeight: 500,
+                textAlign: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+            }}>
+                <span>⚠️</span>
+                <span><strong>Beta:</strong> DeepFish AI is in early access. Expect experimental features, occasional bugs, and evolving capabilities.</span>
+            </div>
+
             {/* Sidebar Navigation */}
             <aside className="sidebar">
                 {/* Logo */}

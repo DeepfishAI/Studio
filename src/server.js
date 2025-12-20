@@ -17,10 +17,39 @@ import * as Memory from './memory.js';
 import { isLlmAvailable, getAvailableProviders } from './llm.js';
 import { getApiKey } from './config.js';
 import { isTwilioEnabled, isElevenLabsEnabled, handleIncomingCall, handleRouteCall, handleAgentConversation, serveAudio, sendSms } from './twilio.js';
+import Redis from 'ioredis';
 
-// Simple in-memory storage for Beta Leads (Volatile on Railway without Redis/Volume)
+// Redis Client (Automatic Recovery System)
+let redis = null;
+if (process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL) {
+    const redisUrl = process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL;
+    console.log(`[System] 🟢 Redis Detected. Connecting to: ${redisUrl.substring(0, 20)}...`);
+    redis = new Redis(redisUrl);
+
+    redis.on('error', (err) => console.error('[Redis] Error:', err.message));
+    redis.on('connect', () => {
+        console.log('[Redis] Connected. Syncing data...');
+        restoreLeads(); // Sync on connect
+    });
+} else {
+    console.log('[System] 🟡 No Redis URL found. Operating in IN-MEMORY mode (data will be lost on restart).');
+}
+
+// Simple in-memory storage for Beta Leads (Mirrored to Redis)
 const BETA_LEADS = new Set(['irene@deepfish.ai']); // Pre-seed admin
 const ADMIN_PHONE = '4059051338';
+
+// Helper: Restore Leads from "The Cloud"
+async function restoreLeads() {
+    if (!redis) return;
+    try {
+        const leads = await redis.smembers('beta_leads');
+        leads.forEach(email => BETA_LEADS.add(email));
+        console.log(`[Redis] Restored ${leads.length} leads from database.`);
+    } catch (err) {
+        console.error('[Redis] Failed to restore leads:', err);
+    }
+}
 
 // ... (existing imports)
 
@@ -44,6 +73,11 @@ app.post('/api/leads', (req, res) => {
     }
 
     BETA_LEADS.add(email);
+
+    // BACKUP: Mirror to Redis
+    if (redis) {
+        redis.sadd('beta_leads', email).catch(err => console.error('[Redis] Save failed:', err));
+    }
 
     // In a real app, this would trigger a "Welcome" email via SendGrid/Resend
 
@@ -198,6 +232,12 @@ app.post('/api/chat', async (req, res) => {
             timestamp: new Date().toISOString()
         });
 
+        // 💾 AUTO-SAVE: Mirror State to Redis
+        if (redis) {
+            // Expire after 7 days to keep db clean
+            redis.setex(`chat:${chat.taskId}`, 60 * 60 * 24 * 7, JSON.stringify(chat));
+        }
+
         res.json({
             response,
             agentId: respondingAgent,
@@ -226,9 +266,20 @@ app.get('/api/chat/:chatId/transcript', (req, res) => {
 /**
  * Get chat history
  */
-app.get('/api/chat/:chatId', (req, res) => {
+app.get('/api/chat/:chatId', async (req, res) => {
     const { chatId } = req.params;
-    const chat = activeChats.get(chatId);
+    let chat = activeChats.get(chatId);
+
+    // 📡 RECOVERY SENSOR: If not in memory, check the cloud
+    if (!chat && redis) {
+        console.log(`[Memory] Chat ${chatId} not found in RAM. Scanning database...`);
+        const savedChat = await redis.get(`chat:${chatId}`);
+        if (savedChat) {
+            chat = JSON.parse(savedChat);
+            activeChats.set(chatId, chat); // Hydrate RAM
+            console.log(`[Memory] 🧬 Reconstructed Chat ${chatId} from database.`);
+        }
+    }
 
     if (!chat) {
         return res.status(404).json({ error: 'Chat not found' });

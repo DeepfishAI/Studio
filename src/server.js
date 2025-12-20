@@ -38,6 +38,23 @@ if (process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL) {
 // Simple in-memory storage for Beta Leads (Mirrored to Redis)
 const BETA_LEADS = new Set(['irene@deepfish.ai']); // Pre-seed admin
 const ADMIN_PHONE = '4059051338';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'deepfish-beta-admin'; // Default fallback
+
+/**
+ * Middleware: Require Admin Secret
+ * Checks x-admin-secret header or ?key= query param
+ */
+const requireAdmin = (req, res, next) => {
+    const authHeader = req.headers['x-admin-secret'];
+    const queryKey = req.query.key;
+
+    if (authHeader === ADMIN_SECRET || queryKey === ADMIN_SECRET) {
+        return next();
+    }
+
+    console.warn(`[Security] Unauthorized access attempt to ${req.originalUrl} from ${req.ip}`);
+    res.status(401).json({ error: 'Unauthorized: Admin access required' });
+};
 
 // Helper: Restore Leads from "The Cloud"
 async function restoreLeads() {
@@ -88,8 +105,7 @@ app.post('/api/leads', (req, res) => {
  * Admin: Get Leads
  * GET /api/leads
  */
-app.get('/api/leads', (req, res) => {
-    // SECURITY: In prod, check for Admin Header
+app.get('/api/leads', requireAdmin, (req, res) => {
     res.json({ leads: Array.from(BETA_LEADS) });
 });
 

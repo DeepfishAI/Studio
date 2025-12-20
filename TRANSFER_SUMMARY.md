@@ -133,6 +133,11 @@ const sora  = await createAgent('hanna', 'sora');   // K-pop skin
 7. **Add more skins** — Create variants for Oracle, Vesper, IT, Sally
 8. **User overlay persistence** — Save learned facts back to `.user.json`
 
+### The Arena (Community & Growth)
+- **Hiring Routine:** User-submitted agents (scored by DeepFish).
+- **Agent Wars:** Automated problem-solving events (Users vs House).
+- **The Art Throwdown:** "AI & The Mob" — Hanna vs Users (Judged by Oracle + Community).
+
 ---
 
 ## Important Context

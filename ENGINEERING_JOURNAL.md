@@ -40,5 +40,12 @@ We implemented a Dual-Write strategy in `bus.js`:
 - Replaced `parseAgentFromSpeech` (brittle keywords) with `vesper.detectIntent` (centralized, config-driven logic).
 - Vesper now uses `virtual_office.json` rules to route calls, meaning if you add a "Writer" agent there, she can route to it immediately without code changes.
 
+### 5. Frontend "Matrix" Dashboard
+**Problem:** The Redis Bus is invisible. You can't see the agents thinking.
+**Fix:**
+- Added `GET /api/stream` (Server-Sent Events) to `server.js`.
+- Created `BusFeed.jsx` in React to visualize the bus.
+- **Result:** You can now watch Vesper route calls and Mei panic about deadlines in real-time on the dashboard.
+
 ---
 *End of Session Note: This architecture now supports the "3 Meis" value proposition—parallel compute instances that share state via Redis but execute independently.*

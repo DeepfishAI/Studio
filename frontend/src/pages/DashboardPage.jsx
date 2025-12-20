@@ -91,13 +91,11 @@ function DashboardPage() {
                         </div>
                     ))}
                 </div>
-                    ))}
             </div>
-        </div>
 
-            {/* Live Operations Feed */ }
-    <BusFeed />
-        </div >
+            {/* Live Operations Feed */}
+            <BusFeed />
+        </div>
     )
 }
 

@@ -74,9 +74,11 @@ export function isTwilioEnabled() {
 
 /**
  * Check if ElevenLabs is configured
+ * TEMPORARILY DISABLED - fix later, using Polly fallback for now
  */
 export function isElevenLabsEnabled() {
-    return !!ELEVENLABS_API_KEY;
+    // return !!ELEVENLABS_API_KEY;  // Disabled for now
+    return false;
 }
 
 /**

@@ -13,6 +13,7 @@ import { writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
+import { eventBus } from './bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -326,6 +327,16 @@ export async function handleAgentConversation(req, res) {
         // Process their message through the agent
         console.log(`[Voice:${agentId}] User said: "${speechResult}"`);
 
+        // Log input to Bus (Async - fire and forget, don't block voice loop)
+        const taskId = `voice-${Date.now()}`; // Short-lived task ID for the call segment
+        eventBus.emit('bus_message', {
+            type: 'VOICE_INPUT',
+            agentId: 'user', // "User" via Phone
+            taskId,
+            content: speechResult,
+            timestamp: new Date().toISOString()
+        });
+
         try {
             let agentResponse;
 
@@ -334,6 +345,15 @@ export async function handleAgentConversation(req, res) {
             } else {
                 agentResponse = getAgentFallback(agentId, speechResult);
             }
+
+            // Log output to Bus
+            eventBus.emit('bus_message', {
+                type: 'VOICE_OUTPUT',
+                agentId,
+                taskId,
+                content: agentResponse,
+                timestamp: new Date().toISOString()
+            });
 
             // Speak the agent's response with their ElevenLabs voice
             await addSpeech(response, agentResponse, agentId, req);

@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { chat, isLlmAvailable } from './llm.js';
 import { mcpTools } from './mcp-tools.js';
+import { eventBus, createTaskContext } from './bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -163,15 +164,30 @@ export class Mei {
 
                 if (match) {
                     const agentId = match[1].trim();
-                    const task = match[2].trim();
+                    const taskContent = match[2].trim();
 
-                    console.log(`[Mei] Executing dispatch: ${agentId} -> ${task}`);
+                    console.log(`[Mei] Executing dispatch: ${agentId} -> ${taskContent}`);
 
-                    // Actually execute the dispatch
-                    // We can use the dispatch tool or just return the structured info for the server to handle
-                    // For now, let's append the system confirmation to the text
+                    // 1. Create Task Context
+                    const taskId = `task-${Date.now()}`;
+                    await createTaskContext({
+                        taskId,
+                        content: taskContent,
+                        agentId: 'mei' // Mei is the creator
+                    });
 
-                    return response + `\n\n✅ *System: Dispatched "${task}" to ${agentId}*`;
+                    // 2. Emit to Bus (Target Agent will wake up)
+                    // Note: In a real system, we'd wait for ACK, but for now we fire-and-forget
+                    eventBus.emit('bus_message', {
+                        type: 'DISPATCH',
+                        taskId,
+                        agentId, // Target
+                        sender: 'mei',
+                        content: taskContent,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    return response + `\n\n✅ *System: Dispatched "${taskContent}" to ${agentId} via RediBus*`;
                 }
 
                 return response;

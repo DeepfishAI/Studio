@@ -51,7 +51,9 @@
                 "blocker",
                 "needs_clarification",
                 "handoff_ready",
-                "all_complete"
+                "all_complete",
+                "VOICE_INPUT",
+                "VOICE_OUTPUT"
             ],
             "sleepDuringExecution": true
         }

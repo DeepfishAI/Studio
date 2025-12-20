@@ -58,6 +58,25 @@ app.get('/api/leads', (req, res) => {
     // SECURITY: In prod, check for Admin Header
     res.json({ leads: Array.from(BETA_LEADS) });
 });
+
+/**
+ * Hourly Vesper Report
+ * Sends SMS status update every 60 minutes
+ */
+let lastReportCount = 1; // Start at 1 (admin)
+setInterval(() => {
+    const currentCount = BETA_LEADS.size;
+    const newLeads = currentCount - lastReportCount;
+
+    // Only send if there's activity or at least once every 4 hours (count % 4 === 0)
+    // For Beta: sending every hour regardless to prove life
+    const msg = `📊 Hourly Report:\n🆕 New Pilots: ${newLeads}\n👥 Total: ${currentCount}\n💸 Est. Cost: < $5.00`;
+
+    console.log(`[Vesper] Sending hourly report: ${msg.replace(/\n/g, ', ')}`);
+    sendSms(ADMIN_PHONE, msg).catch(err => console.error('[Vesper] Report failed:', err));
+
+    lastReportCount = currentCount;
+}, 60 * 60 * 1000); // 60 minutes
 const PORT = process.env.PORT || 3001;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

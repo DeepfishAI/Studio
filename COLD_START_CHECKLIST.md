@@ -1,8 +1,4 @@
 # 🐟 DeepFish Cold-Start Checklist
-## Pre-Flight Systems Check
-
-> *"Like a jet fighter, every system must be verified before launch."*
-
 ---
 
 ## 🔑 PHASE 1: API Keys (CRITICAL)
@@ -17,7 +13,16 @@
 | 6 | **Stripe Billing** | `STRIPE_SECRET_KEY` + `STRIPE_PUBLISHABLE_KEY` | *(Optional)* | ☐ |
 
 ### Verification Command (Local):
+
+The local verification command should be run from:
+
+Folder: 
+C:\REPOS\DF.1.251216.2033
+ (the project root)
+Device: Your local machine (ATLANTIS or wherever you have the repo cloned)
+Shell: PowerShell or any terminal
 ```bash
+
 node -e "import('./src/config.js').then(c => { 
   console.log('Anthropic:', !!c.getApiKey('anthropic') ? '✅' : '❌');
   console.log('Gemini:', !!c.getApiKey('gemini') ? '✅' : '❌');

@@ -54,6 +54,11 @@
             "enabled": true,
             "ref": "$import(../modules/recognizer.json)",
             "purpose": "System maintenance — memory compression, orphan cleanup, skill pruning"
+        },
+        "brandMonitor": {
+            "enabled": true,
+            "ref": "$import(../modules/brand_monitor.json)",
+            "purpose": "Watch for DeepFish mentions on the web"
         }
     },
     "bus": {

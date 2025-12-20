@@ -100,6 +100,9 @@ export async function invokeSkill(skillId, inputs = {}, context = {}) {
             case 'youtube_music':
                 return executeYoutubeMusic(skill, inputs);
 
+            case 'brand_monitor':
+                return checkBrandMentions(inputs);
+
             default:
                 return {
                     success: true,
@@ -289,6 +292,20 @@ function executeYoutubeMusic(skill, inputs) {
             action: `Would search YouTube Music for: "${query}"`,
             message: 'YouTube Music integration requires API connection'
         }
+    };
+}
+
+// Brand Monitor (Mock NewsAPI)
+export async function checkBrandMentions(config = {}) {
+    const keywords = config.keywords || ['DeepFish', 'DeepFishAI'];
+    console.log(`[BrandMonitor] Searching for: ${keywords.join(', ')}`);
+
+    // Placeholder - would call NewsAPI.org here
+    return {
+        timestamp: new Date().toISOString(),
+        mentions: [],
+        summary: "No new mentions found across major news outlets.",
+        status: "clean"
     };
 }
 

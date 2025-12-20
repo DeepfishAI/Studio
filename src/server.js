@@ -39,6 +39,7 @@ if (process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL) {
 const BETA_LEADS = new Set(['irene@deepfish.ai']); // Pre-seed admin
 const ADMIN_PHONE = '4059051338';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'deepfish-beta-admin'; // Default fallback
+const MAX_LEADS = 21; // 1 Admin + 20 Beta Testers
 
 /**
  * Middleware: Require Admin Secret
@@ -82,11 +83,20 @@ app.post('/api/leads', (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
+    // 🛑 SAFETY CAP: Limit to 20 new users
+    if (BETA_LEADS.size >= MAX_LEADS && !BETA_LEADS.has(email)) {
+        console.warn(`[Beta] Signup Rejected: Limit Reached (${BETA_LEADS.size}/${MAX_LEADS}). Email: ${email}`);
+        return res.status(403).json({
+            error: 'Beta Full',
+            message: 'We have reached our limit of 20 beta testers. You have been added to the extended waitlist.'
+        });
+    }
+
     console.log(`[Beta] New Lead Joined: ${email}`);
 
     // Alert Admin via SMS
     if (!BETA_LEADS.has(email)) {
-        sendSms(ADMIN_PHONE, `🚀 New Pilot: ${email}`).catch(err => console.error(err));
+        sendSms(ADMIN_PHONE, `🚀 New Pilot: ${email} (${BETA_LEADS.size + 1}/${MAX_LEADS})`).catch(err => console.error(err));
     }
 
     BETA_LEADS.add(email);

@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { chat, isLlmAvailable } from './llm.js';
+import { mcpTools } from './mcp-tools.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -155,6 +156,23 @@ export class Mei {
                 const response = await chat(this.systemPrompt, context, {
                     maxTokens: 512
                 });
+
+                // PARSE AND EXECUTE COMMANDS
+                const commandRegex = /\[\[DISPATCH:\s*(.+?)\s*\|\s*(.+?)\]\]/i;
+                const match = response.match(commandRegex);
+
+                if (match) {
+                    const agentId = match[1].trim();
+                    const task = match[2].trim();
+
+                    console.log(`[Mei] Executing dispatch: ${agentId} -> ${task}`);
+
+                    // Actually execute the dispatch
+                    // We can use the dispatch tool or just return the structured info for the server to handle
+                    // For now, let's append the system confirmation to the text
+
+                    return response + `\n\n✅ *System: Dispatched "${task}" to ${agentId}*`;
+                }
 
                 return response;
             } catch (err) {

@@ -2,16 +2,33 @@
  * Bus - Inter-Agent Communication System
  * Implements algebraic operations for agent coordination.
  * 
- * Now with EventEmitter for async event handling!
+ * FEATURES:
+ * - EventEmitter for internal async handling
+ * - REDIS Persistence for crash recovery & history
  */
 
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
+import Redis from 'ioredis';
+import { getRedisUrl } from './config.js';
 
-// Create global event bus
+// Create global event bus (internal signal)
 export const eventBus = new EventEmitter();
 
-// In-memory bus state (would be Redis/DB in production)
+// Setup Persistence
+let redis = null;
+const redisUrl = getRedisUrl();
+
+if (redisUrl) {
+    console.log('[Bus] Redis configured. Connecting...');
+    redis = new Redis(redisUrl);
+    redis.on('error', (err) => console.error('[Bus] Redis Error:', err));
+    redis.on('connect', () => console.log('[Bus] Redis Connected!'));
+} else {
+    console.log('[Bus] No Redis URL found. Running in IN-MEMORY mode (State will be lost on restart).');
+}
+
+// In-memory bus state (sync cache)
 const busState = {
     messages: [],
     taskContexts: new Map()
@@ -28,7 +45,7 @@ export function generateContextHash(originalRequest, taskId) {
 /**
  * Create a new task context
  */
-export function createTaskContext(originalRequest) {
+export async function createTaskContext(originalRequest) {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const contextHash = generateContextHash(originalRequest, taskId);
 
@@ -41,7 +58,14 @@ export function createTaskContext(originalRequest) {
         status: 'active'
     };
 
+    // 1. Update Memory
     busState.taskContexts.set(taskId, context);
+
+    // 2. Persist to Redis (if available)
+    if (redis) {
+        await redis.set(`task:${taskId}:context`, JSON.stringify(context));
+        await redis.sadd('active_tasks', taskId); // Track active inputs
+    }
 
     // Emit task created event
     eventBus.emit('task_created', { taskId, contextHash, originalRequest });
@@ -50,20 +74,65 @@ export function createTaskContext(originalRequest) {
 }
 
 /**
- * Get task context
+ * Get task context (Memory -> Redis Fallback)
  */
-export function getTaskContext(taskId) {
-    return busState.taskContexts.get(taskId);
+export async function getTaskContext(taskId) {
+    // 1. Try Memory
+    if (busState.taskContexts.has(taskId)) {
+        return busState.taskContexts.get(taskId);
+    }
+
+    // 2. Try Redis (Hydration)
+    if (redis) {
+        const json = await redis.get(`task:${taskId}:context`);
+        if (json) {
+            const context = JSON.parse(json);
+            // Re-hydrate messages
+            const messagesJson = await redis.lrange(`task:${taskId}:messages`, 0, -1);
+            context.messages = messagesJson.map(m => JSON.parse(m));
+
+            // Populate memory cache
+            busState.taskContexts.set(taskId, context);
+            return context;
+        }
+    }
+
+    return null;
 }
 
 /**
  * Update task status
  */
-export function updateTaskStatus(taskId, status) {
-    const context = getTaskContext(taskId);
+export async function updateTaskStatus(taskId, status) {
+    const context = await getTaskContext(taskId);
     if (context) {
         context.status = status;
+
+        if (redis) {
+            // Update context record
+            await redis.set(`task:${taskId}:context`, JSON.stringify(context));
+
+            // Manage active list
+            if (status === 'completed' || status === 'failed') {
+                await redis.srem('active_tasks', taskId);
+            }
+        }
+
         eventBus.emit('task_status_changed', { taskId, status });
+    }
+}
+
+/**
+ * Save message to storage
+ */
+async function saveMessage(context, message) {
+    // 1. Memory
+    context.messages.push(message);
+    busState.messages.push(message);
+
+    // 2. Redis
+    if (redis) {
+        await redis.rpush(`task:${context.taskId}:messages`, JSON.stringify(message));
     }
 }
 
@@ -74,8 +143,8 @@ export const BusOps = {
     /**
      * ASSERT - Agent states their understanding
      */
-    ASSERT: (agentId, taskId, understanding) => {
-        const context = getTaskContext(taskId);
+    ASSERT: async (agentId, taskId, understanding) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         const message = {
@@ -87,8 +156,7 @@ export const BusOps = {
             timestamp: new Date().toISOString()
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -100,8 +168,8 @@ export const BusOps = {
     /**
      * QUERY - Agent asks a question to peers
      */
-    QUERY: (agentId, taskId, question, targetAgents = []) => {
-        const context = getTaskContext(taskId);
+    QUERY: async (agentId, taskId, question, targetAgents = []) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         const message = {
@@ -116,8 +184,7 @@ export const BusOps = {
             acked: false
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -129,8 +196,8 @@ export const BusOps = {
     /**
      * VALIDATE - Agent confirms work meets requirements
      */
-    VALIDATE: (agentId, taskId, deliverable, approved) => {
-        const context = getTaskContext(taskId);
+    VALIDATE: async (agentId, taskId, deliverable, approved) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         const message = {
@@ -143,8 +210,7 @@ export const BusOps = {
             timestamp: new Date().toISOString()
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -156,8 +222,8 @@ export const BusOps = {
     /**
      * CORRECT - Agent points out an error
      */
-    CORRECT: (agentId, taskId, correction, targetAgent) => {
-        const context = getTaskContext(taskId);
+    CORRECT: async (agentId, taskId, correction, targetAgent) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         const message = {
@@ -172,8 +238,7 @@ export const BusOps = {
             acked: false
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -185,8 +250,8 @@ export const BusOps = {
     /**
      * ACK - Agent acknowledges receipt
      */
-    ACK: (agentId, taskId, messageId) => {
-        const context = getTaskContext(taskId);
+    ACK: async (agentId, taskId, messageId) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         // Find and mark original message as acked
@@ -195,6 +260,7 @@ export const BusOps = {
         );
         if (originalMessage) {
             originalMessage.acked = true;
+            // TODO: Update the original message in Redis if strictly consistent ack tracking is needed
         }
 
         const message = {
@@ -205,8 +271,7 @@ export const BusOps = {
             timestamp: new Date().toISOString()
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -218,8 +283,8 @@ export const BusOps = {
     /**
      * HANDOFF - Agent hands off work to another agent
      */
-    HANDOFF: (fromAgentId, toAgentId, taskId, workPackage) => {
-        const context = getTaskContext(taskId);
+    HANDOFF: async (fromAgentId, toAgentId, taskId, workPackage) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         const message = {
@@ -232,8 +297,7 @@ export const BusOps = {
             timestamp: new Date().toISOString()
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
 
         // Emit event - this is important for orchestration
         eventBus.emit('bus_message', message);
@@ -245,8 +309,8 @@ export const BusOps = {
     /**
      * COMPLETE - Agent signals task completion
      */
-    COMPLETE: (agentId, taskId, deliverable) => {
-        const context = getTaskContext(taskId);
+    COMPLETE: async (agentId, taskId, deliverable) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         const message = {
@@ -258,9 +322,13 @@ export const BusOps = {
             timestamp: new Date().toISOString()
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
         context.status = 'completed';
+
+        if (redis) {
+            await redis.set(`task:${taskId}:context`, JSON.stringify(context));
+            await redis.srem('active_tasks', taskId);
+        }
 
         // Emit event - wakes Mei
         eventBus.emit('bus_message', message);
@@ -273,8 +341,8 @@ export const BusOps = {
     /**
      * BLOCKER - Agent signals they're blocked
      */
-    BLOCKER: (agentId, taskId, blockerDescription) => {
-        const context = getTaskContext(taskId);
+    BLOCKER: async (agentId, taskId, blockerDescription) => {
+        const context = await getTaskContext(taskId);
         if (!context) throw new Error(`Task ${taskId} not found`);
 
         const message = {
@@ -286,14 +354,31 @@ export const BusOps = {
             timestamp: new Date().toISOString()
         };
 
-        context.messages.push(message);
-        busState.messages.push(message);
+        await saveMessage(context, message);
 
         // Emit event - wakes Mei
         eventBus.emit('bus_message', message);
         eventBus.emit('blocker', message);
 
         return message;
+    },
+
+    /**
+     * WAKE - Explicit wake signal (for hydration/recovery)
+     */
+    WAKE: async () => {
+        if (!redis) return [];
+
+        // Find tasks that were active last time
+        const activeTasks = await redis.smembers('active_tasks');
+        const tasks = [];
+
+        for (const taskId of activeTasks) {
+            const ctx = await getTaskContext(taskId);
+            if (ctx) tasks.push(ctx);
+        }
+
+        return tasks;
     }
 };
 
@@ -301,15 +386,20 @@ export const BusOps = {
  * Get bus transcript for a task
  */
 export function getTaskTranscript(taskId) {
-    const context = getTaskContext(taskId);
-    if (!context) return [];
-    return context.messages;
+    // Note: This is synchronous access to memory cache.
+    // If relying on hydration, ensure getTaskContext was called first.
+    if (busState.taskContexts.has(taskId)) {
+        return busState.taskContexts.get(taskId).messages;
+    }
+    return [];
 }
 
 /**
  * Get all active tasks
  */
 export function getActiveTasks() {
+    // Returns in-memory view. 
+    // Use BusOps.WAKE() to hydrate from Redis on startup.
     const active = [];
     busState.taskContexts.forEach((context, taskId) => {
         if (context.status === 'active') {
@@ -323,7 +413,8 @@ export function getActiveTasks() {
  * Verify context hash hasn't drifted
  */
 export function verifyContext(taskId, providedHash) {
-    const context = getTaskContext(taskId);
+    // Check memory first
+    const context = busState.taskContexts.get(taskId);
     if (!context) return false;
     return context.contextHash === providedHash;
 }

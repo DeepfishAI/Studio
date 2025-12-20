@@ -31,6 +31,7 @@ export function loadConfig() {
 
     // Fallback to environment variables
     config = {
+        redis_url: process.env.REDIS_URL || '',
         llm_providers: {
             anthropic: {
                 api_key: process.env.ANTHROPIC_API_KEY || '',
@@ -81,4 +82,9 @@ export function isProviderEnabled(provider) {
 export function getTier() {
     const cfg = loadConfig();
     return cfg.tier || 'starter';
+}
+
+export function getRedisUrl() {
+    const cfg = loadConfig();
+    return cfg.redis_url || '';
 }

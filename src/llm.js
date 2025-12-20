@@ -6,6 +6,7 @@
  * - Anthropic Claude (primary)
  * - Google Gemini
  * - NVIDIA NIM (via OpenAI-compatible API)
+ * - MOCK (Fallback for testing)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -39,8 +40,8 @@ export async function chat(systemPrompt, userMessage, options = {}) {
         provider = 'anthropic'
     } = options;
 
-    // Try requested provider, fall back to any available
-    const providers = [provider, 'anthropic', 'gemini', 'nvidia'];
+    // Try requested provider, fall back to any available, then MOCK
+    const providers = [provider, 'anthropic', 'gemini', 'nvidia', 'mock'];
 
     console.log(`[LLM] Starting chat. Checking providers in order: ${providers.join(', ')}`);
 
@@ -68,6 +69,7 @@ export async function chat(systemPrompt, userMessage, options = {}) {
  * Check if a provider is available
  */
 function isProviderAvailable(provider) {
+    if (provider === 'mock') return true;
     return !!getApiKey(provider) || isProviderEnabled(provider);
 }
 
@@ -83,9 +85,32 @@ async function chatWithProvider(provider, systemPrompt, userMessage, options) {
             return chatGemini(systemPrompt, userMessage, options);
         case 'nvidia':
             return chatNvidia(systemPrompt, userMessage, options);
+        case 'mock':
+            return chatMock(systemPrompt, userMessage, options);
         default:
             throw new Error(`Provider ${provider} not supported`);
     }
+}
+
+/**
+ * Mock Provider for Testing
+ */
+async function chatMock(systemPrompt, userMessage, options) {
+    // Extract identity from system prompt if possible
+    const match = systemPrompt.match(/You are (.+?),/);
+    const identity = match ? match[1] : 'Unknown Agent';
+
+    return `[MOCK RESPONSE from ${identity}]
+    
+I have received your request regarding: "${userMessage.substring(0, 50)}..."
+
+Since I am a mock instance running in test mode, I cannot generate real content.
+However, I confirm that:
+1. My identity was correctly injected: ${identity}
+2. I successfully intercepted the request.
+3. I am ready to process this as a parallel instance.
+
+[End Mock Output]`;
 }
 
 /**
@@ -197,7 +222,8 @@ async function chatNvidia(systemPrompt, userMessage, options) {
 export function isLlmAvailable() {
     return isProviderAvailable('anthropic') ||
         isProviderAvailable('gemini') ||
-        isProviderAvailable('nvidia');
+        isProviderAvailable('nvidia') ||
+        true; // Always allow (Mock fallback)
 }
 
 /**
@@ -208,5 +234,6 @@ export function getAvailableProviders() {
     if (isProviderAvailable('anthropic')) providers.push('anthropic');
     if (isProviderAvailable('gemini')) providers.push('gemini');
     if (isProviderAvailable('nvidia')) providers.push('nvidia');
+    providers.push('mock');
     return providers;
 }

@@ -5,35 +5,8 @@ import SkillPicker from '../components/SkillPicker'
 import { trainingApi } from '../services/training'
 import { configApi } from '../services/configApi'
 
-// Full LLM Model Catalog - The agent's BRAIN (not skills, not modules)
-// In production, this would come from llm-resolver.js / llm_catalog.json
-const LLM_MODELS = [
-    // Anthropic
-    { id: 'claude-opus-4-20250514', provider: 'anthropic', name: 'Claude Opus 4', description: 'Most intelligent — complex analysis, nuanced understanding', tier: 'platinum', thinkingMode: true },
-    { id: 'claude-sonnet-4-20250514', provider: 'anthropic', name: 'Claude Sonnet 4', description: 'Best balance of intelligence and speed', tier: 'premium', thinkingMode: true },
-    { id: 'claude-3-5-haiku-20241022', provider: 'anthropic', name: 'Claude 3.5 Haiku', description: 'Fast and affordable — quick responses', tier: 'pro' },
-    // OpenAI
-    { id: 'gpt-4o', provider: 'openai', name: 'GPT-4o', description: 'Flagship multimodal — text, vision, audio', tier: 'premium', multimodal: true },
-    { id: 'gpt-4o-mini', provider: 'openai', name: 'GPT-4o Mini', description: 'Fast, affordable small model', tier: 'pro' },
-    { id: 'o1-preview', provider: 'openai', name: 'o1 Preview', description: 'Advanced reasoning — thinks before answering', tier: 'platinum', thinkingMode: true },
-    // Google
-    { id: 'gemini-2.0-flash', provider: 'google', name: 'Gemini 2.0 Flash', description: 'Latest fast multimodal — 1M context', tier: 'pro', multimodal: true },
-    { id: 'gemini-2.0-flash-thinking', provider: 'google', name: 'Gemini Flash Thinking', description: 'Reasoning model with visible thinking', tier: 'premium', thinkingMode: true },
-    { id: 'gemini-1.5-pro', provider: 'google', name: 'Gemini 1.5 Pro', description: 'Powerful multimodal — 2M context window', tier: 'premium', multimodal: true },
-    // NVIDIA / Open Models
-    { id: 'meta/llama-3.1-405b-instruct', provider: 'nvidia', name: 'Llama 3.1 405B', description: 'Meta\'s largest — maximum open-source capability', tier: 'platinum' },
-    { id: 'meta/llama-3.1-70b-instruct', provider: 'nvidia', name: 'Llama 3.1 70B', description: 'Strong balanced model from Meta', tier: 'premium' },
-    { id: 'meta/llama-3.1-8b-instruct', provider: 'nvidia', name: 'Llama 3.1 8B', description: 'Fast, efficient small Llama', tier: 'pro' },
-    { id: 'meta/llama-4-maverick-17b-128e-instruct', provider: 'nvidia', name: 'Llama 4 Maverick', description: 'Latest Llama 4 — cutting edge', tier: 'platinum' },
-    { id: 'nvidia/nemotron-3-nano-30b-a3b', provider: 'nvidia', name: 'Nemotron 30B', description: 'NVIDIA reasoning with chain-of-thought', tier: 'platinum', thinkingMode: true },
-    { id: 'mistralai/mistral-large-latest', provider: 'nvidia', name: 'Mistral Large', description: 'Excellent for creative work', tier: 'premium' },
-    { id: 'mistralai/mixtral-8x22b-instruct-v0.1', provider: 'nvidia', name: 'Mixtral 8x22B', description: 'Mixture of experts — versatile', tier: 'premium' },
-    { id: 'qwen/qwen2.5-coder-32b-instruct', provider: 'nvidia', name: 'Qwen 2.5 Coder', description: 'Specialized for code generation', tier: 'platinum' },
-    { id: 'deepseek-ai/deepseek-r1', provider: 'nvidia', name: 'DeepSeek R1', description: 'Advanced reasoning with thinking trace', tier: 'platinum', thinkingMode: true },
-    { id: 'google/gemma-2-27b-it', provider: 'nvidia', name: 'Gemma 2 27B', description: 'Google\'s efficient open model', tier: 'pro' },
-    { id: 'google/gemma-2-9b-it', provider: 'nvidia', name: 'Gemma 2 9B', description: 'Small, fast Google model', tier: 'free' },
-    { id: 'microsoft/phi-3-mini-4k-instruct', provider: 'nvidia', name: 'Phi-3 Mini', description: 'Microsoft tiny powerhouse', tier: 'free' },
-]
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 
 function AgentProfilePage() {
     const { agentId } = useParams()
@@ -47,10 +20,46 @@ function AgentProfilePage() {
     const [selectedLlmSkill, setSelectedLlmSkill] = useState(null)
     const [userTier] = useState('platinum') // In production, get from user context
 
+    // LLM Models from Oracle (fetched from API)
+    const [llmModels, setLlmModels] = useState([])
+    const [llmLoading, setLlmLoading] = useState(true)
+
     // Customization State
     const [customNickname, setCustomNickname] = useState('')
     const [customInstructions, setCustomInstructions] = useState('')
     const [isSaving, setIsSaving] = useState(false)
+
+    // Load LLM models from Oracle's list
+    useEffect(() => {
+        Promise.all([
+            fetch(`${API_BASE}/api/llm/models`).then(r => r.json()),
+            fetch(`${API_BASE}/api/llm/override/${agentId}`).then(r => r.json())
+        ])
+            .then(([modelsData, overrideData]) => {
+                setLlmModels(modelsData.models || []);
+                setSelectedLlmSkill(overrideData.override);
+                setLlmLoading(false);
+            })
+            .catch(err => {
+                console.error('Failed to load LLM models:', err);
+                setLlmLoading(false);
+            });
+    }, [agentId]);
+
+    // Handle LLM selection change
+    const handleLlmChange = async (modelId) => {
+        setSelectedLlmSkill(modelId);
+        try {
+            await fetch(`${API_BASE}/api/llm/override/${agentId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ modelId })
+            });
+            console.log(`[LLM] Saved override for ${agentId}: ${modelId}`);
+        } catch (err) {
+            console.error('Failed to save LLM override:', err);
+        }
+    };
 
     // Load facts from backend on mount
     useEffect(() => {
@@ -337,18 +346,37 @@ function AgentProfilePage() {
                     This is {agent.name}'s underlying AI model — the brain that powers all responses.
                     Oracle sets the default, but you can override it.
                 </p>
-                <SkillPicker
-                    agentId={agent.id}
-                    agentName={agent.name}
-                    agentColor={agent.id}
-                    userTier={userTier}
-                    currentSkillId={selectedLlmSkill}
-                    onSkillChange={setSelectedLlmSkill}
-                    skills={LLM_MODELS}
-                />
+                {llmLoading ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                        Loading models from Oracle...
+                    </div>
+                ) : (
+                    <SkillPicker
+                        agentId={agent.id}
+                        agentName={agent.name}
+                        agentColor={agent.id}
+                        userTier={userTier}
+                        currentSkillId={selectedLlmSkill}
+                        onSkillChange={handleLlmChange}
+                        skills={llmModels}
+                    />
+                )}
                 <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: 'var(--space-3)' }}>
-                    Override the default LLM for {agent.name}. Your selection persists across sessions.
+                    {selectedLlmSkill ? (
+                        <span style={{ color: 'var(--color-success)' }}>✓ Custom model selected. Click "Reset to Oracle Default" to revert.</span>
+                    ) : (
+                        <span>Using Oracle's recommended model. Select one above to override.</span>
+                    )}
                 </p>
+                {selectedLlmSkill && (
+                    <button
+                        className="btn btn--secondary btn--sm"
+                        style={{ marginTop: 'var(--space-2)' }}
+                        onClick={() => handleLlmChange(null)}
+                    >
+                        Reset to Oracle Default
+                    </button>
+                )}
             </section>
 
             <section id="training" className="agent-profile__section">
@@ -408,7 +436,7 @@ function AgentProfilePage() {
                     </p>
                 </div>
             </section>
-        </div>
+        </div >
     )
 }
 

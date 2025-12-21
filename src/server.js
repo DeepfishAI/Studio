@@ -208,6 +208,86 @@ app.post('/incoming', handleIncomingCall);
 app.post('/webhook', handleIncomingCall);
 
 // ============================================
+// LLM API - Get available models (Oracle's list)
+// ============================================
+
+// Full LLM Model Catalog - Oracle's master list
+const LLM_MODELS = [
+    // Anthropic
+    { id: 'claude-opus-4-20250514', provider: 'anthropic', name: 'Claude Opus 4', description: 'Most intelligent — complex analysis, nuanced understanding', tier: 'platinum' },
+    { id: 'claude-sonnet-4-20250514', provider: 'anthropic', name: 'Claude Sonnet 4', description: 'Best balance of intelligence and speed', tier: 'premium' },
+    { id: 'claude-3-5-haiku-20241022', provider: 'anthropic', name: 'Claude 3.5 Haiku', description: 'Fast and affordable — quick responses', tier: 'pro' },
+    // Google
+    { id: 'gemini-2.0-flash', provider: 'gemini', name: 'Gemini 2.0 Flash', description: 'Latest fast multimodal — 1M context', tier: 'pro' },
+    { id: 'gemini-2.0-flash-thinking', provider: 'gemini', name: 'Gemini Flash Thinking', description: 'Reasoning model with visible thinking', tier: 'premium' },
+    { id: 'gemini-1.5-pro', provider: 'gemini', name: 'Gemini 1.5 Pro', description: 'Powerful multimodal — 2M context window', tier: 'premium' },
+    // NVIDIA / Open Models
+    { id: 'meta/llama-3.1-405b-instruct', provider: 'nvidia', name: 'Llama 3.1 405B', description: 'Meta\'s largest — maximum open-source capability', tier: 'platinum' },
+    { id: 'meta/llama-3.1-70b-instruct', provider: 'nvidia', name: 'Llama 3.1 70B', description: 'Strong balanced model from Meta', tier: 'premium' },
+    { id: 'meta/llama-3.1-8b-instruct', provider: 'nvidia', name: 'Llama 3.1 8B', description: 'Fast, efficient small Llama', tier: 'pro' },
+    { id: 'deepseek-ai/deepseek-r1', provider: 'nvidia', name: 'DeepSeek R1', description: 'Advanced reasoning with thinking trace', tier: 'platinum' },
+    { id: 'qwen/qwen2.5-coder-32b-instruct', provider: 'nvidia', name: 'Qwen 2.5 Coder', description: 'Specialized for code generation', tier: 'platinum' },
+];
+
+// In-memory storage for user LLM overrides (session-based)
+const userLlmOverrides = new Map();
+
+/**
+ * Get all available LLM models
+ * GET /api/llm/models
+ */
+app.get('/api/llm/models', (req, res) => {
+    const availableProviders = getAvailableProviders();
+
+    // Mark models as available based on configured providers
+    const modelsWithAvailability = LLM_MODELS.map(model => ({
+        ...model,
+        available: availableProviders.includes(model.provider)
+    }));
+
+    res.json({
+        success: true,
+        providers: availableProviders,
+        models: modelsWithAvailability
+    });
+});
+
+/**
+ * Get/Set LLM override for an agent
+ * GET /api/llm/override/:agentId
+ * POST /api/llm/override/:agentId
+ */
+app.get('/api/llm/override/:agentId', (req, res) => {
+    const { agentId } = req.params;
+    const override = userLlmOverrides.get(agentId);
+    res.json({
+        success: true,
+        agentId,
+        override: override || null,
+        isDefault: !override
+    });
+});
+
+app.post('/api/llm/override/:agentId', (req, res) => {
+    const { agentId } = req.params;
+    const { modelId } = req.body;
+
+    if (modelId) {
+        userLlmOverrides.set(agentId, modelId);
+        console.log(`[LLM] Override set: ${agentId} → ${modelId}`);
+    } else {
+        userLlmOverrides.delete(agentId);
+        console.log(`[LLM] Override cleared for ${agentId}`);
+    }
+
+    res.json({
+        success: true,
+        agentId,
+        override: modelId || null
+    });
+});
+
+// ============================================
 // LOGS API - View agent communication history
 // ============================================
 

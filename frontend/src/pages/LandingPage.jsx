@@ -203,6 +203,8 @@ export default function LandingPage() {
             <p className="hero-subtitle">
                 You don't need another chatbot. You need a workgroup.
                 <br />
+                Autonomous AI experts, all working together to bring your ideas to life.
+                <br />
                 Spin up autonomous specialists, assign real work, and scale your creative output.
             </p>
 

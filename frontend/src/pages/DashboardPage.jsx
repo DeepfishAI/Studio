@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { agents } from '../data/agents'
@@ -6,6 +6,7 @@ import BusFeed from '../components/BusFeed'
 
 function DashboardPage() {
     const { user } = useAuth()
+    const [showLogs, setShowLogs] = useState(false)
 
     return (
         <div className="dashboard-page">
@@ -23,7 +24,18 @@ function DashboardPage() {
             <div className="dashboard__section">
                 <div className="dashboard__section-header">
                     <h2 className="dashboard__section-title">Quick Actions</h2>
+                    <button
+                        onClick={() => setShowLogs(!showLogs)}
+                        className="btn btn--ghost btn--sm"
+                        style={{ marginLeft: 'auto' }}
+                    >
+                        {showLogs ? '✕ Close Logs' : '📋 View Logs'}
+                    </button>
                 </div>
+
+                {/* Logs Panel */}
+                {showLogs && <LogsViewer />}
+
                 <div className="quick-actions">
                     <Link to="/app/chat/mei" className="quick-action-card">
                         <div className="quick-action-card__icon">💬</div>
@@ -164,6 +176,107 @@ function ProjectHistoryList() {
                 .history-item__footer { font-size: 0.8rem; color: #6b7280; }
                 .tag--completed { color: #10b981; }
                 .tag--active { color: #3b82f6; }
+            `}</style>
+        </div>
+    );
+}
+
+// Logs Viewer Component
+function LogsViewer() {
+    const [logs, setLogs] = React.useState([]);
+    const [tasks, setTasks] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
+    const [activeTab, setActiveTab] = React.useState('logs');
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+
+    React.useEffect(() => {
+        Promise.all([
+            fetch(`${API_BASE}/api/logs?limit=50`).then(r => r.json()),
+            fetch(`${API_BASE}/api/tasks`).then(r => r.json())
+        ])
+            .then(([logsData, tasksData]) => {
+                setLogs(logsData.logs || []);
+                setTasks(tasksData.tasks || []);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error('[LogsViewer] Error:', err);
+                setLoading(false);
+            });
+    }, []);
+
+    if (loading) return <div className="logs-loading">Loading logs...</div>;
+
+    return (
+        <div className="logs-viewer">
+            <div className="logs-tabs">
+                <button
+                    className={`logs-tab ${activeTab === 'logs' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('logs')}
+                >
+                    📋 Messages ({logs.length})
+                </button>
+                <button
+                    className={`logs-tab ${activeTab === 'tasks' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('tasks')}
+                >
+                    📦 Tasks ({tasks.length})
+                </button>
+            </div>
+
+            {activeTab === 'logs' && (
+                <div className="logs-list">
+                    {logs.length === 0 ? (
+                        <div className="logs-empty">No messages yet. Start a project via chat or phone!</div>
+                    ) : logs.map((log, i) => (
+                        <div key={i} className={`log-item log-item--${log.operation?.toLowerCase()}`}>
+                            <div className="log-header">
+                                <span className="log-op">{log.operation}</span>
+                                <span className="log-from">{log.from} → {log.to || 'system'}</span>
+                                <span className="log-time">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                            <div className="log-content">{log.content?.substring(0, 200)}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {activeTab === 'tasks' && (
+                <div className="logs-list">
+                    {tasks.length === 0 ? (
+                        <div className="logs-empty">No tasks recorded yet.</div>
+                    ) : tasks.map((task, i) => (
+                        <div key={i} className={`log-item log-item--task`}>
+                            <div className="log-header">
+                                <span className={`log-status status--${task.status}`}>{task.status}</span>
+                                <span className="log-time">{new Date(task.createdAt).toLocaleString()}</span>
+                            </div>
+                            <div className="log-content">{task.originalRequest}</div>
+                            <div className="log-meta">{task.messageCount} messages</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <style>{`
+                .logs-viewer { background: #12151a; border: 1px solid #2d3342; border-radius: 8px; margin-bottom: 20px; max-height: 400px; overflow: hidden; display: flex; flex-direction: column; }
+                .logs-tabs { display: flex; border-bottom: 1px solid #2d3342; }
+                .logs-tab { flex: 1; padding: 10px; background: none; border: none; color: #8b9bb4; cursor: pointer; }
+                .logs-tab.active { background: #1a1d24; color: #fff; border-bottom: 2px solid #3b82f6; }
+                .logs-list { overflow-y: auto; max-height: 340px; padding: 10px; }
+                .logs-loading, .logs-empty { padding: 20px; text-align: center; color: #6b7280; }
+                .log-item { background: #1a1d24; border: 1px solid #2d3342; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 0.85rem; }
+                .log-item--assert { border-left: 3px solid #3b82f6; }
+                .log-item--handoff { border-left: 3px solid #f59e0b; }
+                .log-item--complete { border-left: 3px solid #10b981; }
+                .log-item--blocker { border-left: 3px solid #ef4444; }
+                .log-header { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 0.75rem; color: #8b9bb4; }
+                .log-op { background: #252a36; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+                .log-from { flex: 1; }
+                .log-content { color: #d1d5db; word-break: break-word; }
+                .log-meta { margin-top: 6px; font-size: 0.75rem; color: #6b7280; }
+                .status--active { color: #3b82f6; }
+                .status--completed { color: #10b981; }
             `}</style>
         </div>
     );

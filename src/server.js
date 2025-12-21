@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Vesper } from './vesper.js';
 import { Mei } from './mei.js';
 import { getAgent } from './agent.js';
-import { createTaskContext, BusOps, getTaskTranscript, eventBus } from './bus.js';
+import { createTaskContext, BusOps, getTaskTranscript, eventBus, getAllLogs, getTaskSummaries } from './bus.js';
 import * as Billing from './billing.js';
 import * as Memory from './memory.js';
 import { isLlmAvailable, getAvailableProviders } from './llm.js';
@@ -204,26 +204,39 @@ app.use('/api/training', trainingRoutes);
 app.post('/incoming', handleIncomingCall);
 app.post('/webhook', handleIncomingCall);
 
-// OLD: /api/agents (Moved to chat router logic or keep simple here?
-// The chat router handles /api/chat/agents? No, API.js calls /api/agents.
-// Let's keep /api/agents here or alias it to chat router if it has it.
-// Chat router has `router.get('/agents', ...)` mounted at `/api/chat`.
-// So path is `/api/chat/agents`.
-// Frontend api.js expects `/api/agents`.
-// I should add a redirect or re-export.
-// For simplicity, let's keep the simple agent list route here or move it to a `general` router.
-// Actually, `chat.js` has `router.get('/agents')`. 
-// So the new path is `/api/chat/agents`.
-// I MUST UPDATE frontend/src/services/api.js OR duplicate the route here.
-// I'll duplicate the simple route here for backward compatibility to avoid breaking frontend immediately.
+// ============================================
+// LOGS API - View agent communication history
+// ============================================
+
+/**
+ * Get all bus logs
+ * GET /api/logs
+ */
+app.get('/api/logs', (req, res) => {
+    const limit = parseInt(req.query.limit) || 100;
+    const logs = getAllLogs(limit);
+    res.json({
+        success: true,
+        count: logs.length,
+        logs
+    });
+});
+
+/**
+ * Get task summaries
+ * GET /api/tasks
+ */
+app.get('/api/tasks', (req, res) => {
+    const tasks = getTaskSummaries();
+    res.json({
+        success: true,
+        count: tasks.length,
+        tasks
+    });
+});
+
+// OLD: /api/agents (redirect for backward compatibility)
 app.get('/api/agents', (req, res) => {
-    // We need Vesper instance access.
-    // Ideally Vesper is singleton.
-    // Chat router creates new Vesper instance.
-    // Here we also have one.
-    // This duplication of Vesper instance is not ideal (memory wise).
-    // Future refactor: Singleton `src/services/vesper.service.js`.
-    // For now:
     res.redirect('/api/chat/agents');
 });
 

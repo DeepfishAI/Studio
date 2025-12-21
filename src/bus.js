@@ -434,3 +434,47 @@ export function subscribe(event, handler) {
 export function subscribeOnce(event, handler) {
     eventBus.once(event, handler);
 }
+
+/**
+ * Get all logs from all task contexts
+ * Returns array of all messages sorted by timestamp
+ */
+export function getAllLogs(limit = 100) {
+    const allMessages = [];
+
+    // Collect messages from all task contexts
+    busState.taskContexts.forEach((context, taskId) => {
+        if (context.messages && Array.isArray(context.messages)) {
+            context.messages.forEach(msg => {
+                allMessages.push({
+                    ...msg,
+                    taskId,
+                    originalRequest: context.originalRequest?.substring(0, 50)
+                });
+            });
+        }
+    });
+
+    // Sort by timestamp (newest first)
+    allMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Return limited amount
+    return allMessages.slice(0, limit);
+}
+
+/**
+ * Get all active task contexts with their message counts
+ */
+export function getTaskSummaries() {
+    const summaries = [];
+    busState.taskContexts.forEach((context, taskId) => {
+        summaries.push({
+            taskId,
+            status: context.status,
+            originalRequest: context.originalRequest?.substring(0, 100),
+            messageCount: context.messages?.length || 0,
+            createdAt: context.createdAt
+        });
+    });
+    return summaries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}

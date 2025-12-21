@@ -316,28 +316,25 @@ async function addSpeech(response, text, agentId, req) {
 export async function handleIncomingCall(req, res) {
     const response = new VoiceResponse();
 
-    // Vesper's greeting
-    await addSpeech(response, 'DeepFish studios... Vesper speaking.', 'vesper', req);
+    // Vesper's greeting - professional Hong Kong style
+    await addSpeech(response, 'DeepFish Hong Kong... How may I direct your call?', 'vesper', req);
 
-    // Pause for effect (Vesper's style)
-    response.pause({ length: 1 });
-
-    // Ask who they want to talk to
+    // Gather speech input - wait for caller to say who they want
     const gather = response.gather({
         input: 'speech',
         action: '/api/voice/route',
         method: 'POST',
         speechTimeout: 'auto',
         language: 'en-US',
-        hints: 'Mei, Hanna, IT, Sally, Oracle, project manager, creative, developer, marketing'
+        hints: 'Mei, Hanna, IT, Sally, Oracle, project manager, creative, developer, marketing, help, new project'
     });
 
-    // For gather, we still use Polly since we need inline TTS and ElevenLabs is async/expensive for repeats
-    gather.say({
-        voice: 'Polly.Joanna'
-    }, 'Who would you like to speak with today? You can ask for Mei, Hanna, IT, Sally, or Oracle.');
+    // Silent gather - Vesper listens without prompting
+    // (The greeting already asked how to direct the call)
 
-    // If no input, ask again
+    // If no input after timeout, gently prompt
+    response.pause({ length: 5 });
+    await addSpeech(response, 'I\'m still here. Just let me know who you\'d like to speak with.', 'vesper', req);
     response.redirect('/api/voice/incoming');
 
     res.type('text/xml');

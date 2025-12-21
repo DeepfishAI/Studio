@@ -162,6 +162,20 @@ if (redis) {
     app.set('redis', redis);
 }
 
+/**
+ * Health check
+ */
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        agents: {
+            vesper: 'online',
+            mei: 'online'
+        }
+    });
+});
+
 // ============================================
 // MOUNT ROUTERS
 // ============================================

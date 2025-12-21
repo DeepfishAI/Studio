@@ -14,6 +14,7 @@ import { Vesper } from './vesper.js';
 import { Mei } from './mei.js';
 import { getAgent } from './agent.js';
 import { createTaskContext, BusOps, getTaskTranscript, eventBus, getAllLogs, getTaskSummaries } from './bus.js';
+import { getOrchestrator } from './orchestrator.js'; // The Central Nervous System
 import * as Billing from './billing.js';
 import * as Memory from './memory.js';
 import { isLlmAvailable, getAvailableProviders } from './llm.js';
@@ -396,6 +397,26 @@ app.get('/api/events', (req, res) => {
     });
 });
 
+/**
+ * Bridge Status Proxy
+ * Allows frontend to check Python sidecar status via Node.js
+ * GET /api/bridge/status
+ */
+app.get('/api/bridge/status', async (req, res) => {
+    try {
+        const response = await fetch('http://localhost:8000/status');
+        if (response.ok) {
+            const data = await response.json();
+            res.json(data);
+        } else {
+            res.status(502).json({ status: 'offline', error: 'Bridge returned error' });
+        }
+    } catch (e) {
+        // console.error('[Proxy] Bridge check failed:', e.message);
+        res.status(502).json({ status: 'offline', error: 'Bridge unreachable' });
+    }
+});
+
 // Project History & Deliverables API
 // GET /api/projects
 app.get('/api/projects', async (req, res) => {
@@ -458,6 +479,10 @@ server.listen(PORT, () => {
     console.log(`📞 Twilio: ${isTwilioEnabled() ? 'ENABLED' : 'DISABLED'}`);
     console.log(`🔊 ElevenLabs Voice: ${isElevenLabsEnabled() ? 'ENABLED' : 'DISABLED (using Polly fallback)'}`);
     console.log(`🌐 WebSocket: ENABLED on /media-stream`);
+
+    // Start the Central Orchestrator (Mei's Nervous System)
+    getOrchestrator();
+    console.log(`🧠 Orchestrator: ONLINE (Listening for DISPATCH events)`);
 
     // LLM Provider diagnostics
     const llmAvailable = isLlmAvailable();

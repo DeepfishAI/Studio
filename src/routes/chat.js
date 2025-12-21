@@ -41,7 +41,10 @@ router.get('/agents', (req, res) => {
         id: agent.id,
         name: agent.name,
         title: agent.title,
-        emoji: agent.emoji
+        emoji: agent.emoji,
+        skin: agent.skin,
+        voice: agent.voice,
+        stats: agent.stats
     }));
 
     res.json({ agents });

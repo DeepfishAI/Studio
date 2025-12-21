@@ -135,6 +135,9 @@ function loadRoutingKeywords() {
 /**
  * Load available agents from agent.json files
  */
+/**
+ * Load available agents from agent.json and user.json files
+ */
 function loadAvailableAgents() {
     const agents = [];
     const agentIds = ['mei', 'oracle', 'hanna', 'it', 'sally', 'abacus'];
@@ -144,11 +147,25 @@ function loadAvailableAgents() {
             const agentPath = join(AGENTS_DIR, `${id}.agent.json`);
             if (existsSync(agentPath)) {
                 const agent = JSON.parse(readFileSync(agentPath, 'utf-8'));
+
+                // Load User Overlay
+                let userConfig = {};
+                try {
+                    const userPath = join(AGENTS_DIR, `${id}.user.json`);
+                    if (existsSync(userPath)) {
+                        userConfig = JSON.parse(readFileSync(userPath, 'utf-8'));
+                    }
+                } catch (e) { }
+
                 agents.push({
                     id: agent.identity?.id || id,
                     name: agent.identity?.name || id,
                     title: agent.identity?.title || 'Agent',
-                    emoji: getAgentEmoji(id)
+                    emoji: getAgentEmoji(id),
+                    // Merge User Preferences
+                    skin: userConfig.preferences?.skin?.activeSkin || 'default',
+                    voice: userConfig.preferences?.voice,
+                    stats: userConfig.stats
                 });
             }
         } catch (err) { }

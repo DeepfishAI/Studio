@@ -191,10 +191,76 @@ export default function LandingPage() {
                     color: #4a5568;
                     font-size: 0.9rem;
                 }
+                }
+                
+                /* Floating Testimonials */
+                .testimonials-layer {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    overflow: hidden;
+                    z-index: 1;
+                }
+                
+                .testimonial-card {
+                    position: absolute;
+                    background: rgba(255, 255, 255, 0.03);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    padding: 15px 20px;
+                    border-radius: 16px;
+                    max-width: 280px;
+                    color: rgba(255, 255, 255, 0.9);
+                    font-size: 0.9rem;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                    animation: floatUp 20s infinite linear;
+                    opacity: 0;
+                }
+                
+                .testimonial-card p {
+                    margin: 0 0 10px 0;
+                    font-style: italic;
+                    line-height: 1.4;
+                }
+                
+                .t-user {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                
+                .t-user img {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                }
+                
+                .t-user span {
+                    font-size: 0.8rem;
+                    color: #8b9bb4;
+                    font-weight: 600;
+                }
+
+                @keyframes floatUp {
+                    0% { transform: translateY(100vh) scale(0.9); opacity: 0; }
+                    10% { opacity: 1; }
+                    90% { opacity: 1; }
+                    100% { transform: translateY(-20vh) scale(0.9); opacity: 0; }
+                }
+
+                .t-1 { left: 10%; animation-delay: 0s; animation-duration: 25s; }
+                .t-2 { right: 15%; animation-delay: 5s; animation-duration: 28s; }
+                .t-3 { left: 20%; animation-delay: 12s; animation-duration: 30s; }
+                .t-4 { right: 8%; animation-delay: 18s; animation-duration: 22s; bottom: -100px; }
+
                 @media (max-width: 768px) {
                     .hero-title { font-size: 2.5rem; }
                     .landing-header { padding: 20px; }
                     .cta-form { flex-direction: column; }
+                    .testimonial-card { display: none; } /* Hide on mobile to save space */
                 }
             `}</style>
 
@@ -247,6 +313,38 @@ export default function LandingPage() {
                     Welcome to the Resistance. Redirecting...
                 </div>
             )}
+
+            {/* Testimonials Layer */}
+            <div className="testimonials-layer">
+                <div className="testimonial-card t-1">
+                    <p>"It’s like The Sims, but they do your taxes."</p>
+                    <div className="t-user">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah" alt="" />
+                        <span>@SarahTech</span>
+                    </div>
+                </div>
+                <div className="testimonial-card t-2">
+                    <p>"Vesper blocked my ex. 5 stars."</p>
+                    <div className="t-user">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Crypto" alt="" />
+                        <span>@CryptoKing99</span>
+                    </div>
+                </div>
+                <div className="testimonial-card t-3">
+                    <p>"Node.js CEO shouting at Python scientist? Too real."</p>
+                    <div className="t-user">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Dev" alt="" />
+                        <span>@DevLife</span>
+                    </div>
+                </div>
+                <div className="testimonial-card t-4">
+                    <p>"Finally, an AI that sleeps when I do."</p>
+                    <div className="t-user">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Indie" alt="" />
+                        <span>@IndieHackerPro</span>
+                    </div>
+                </div>
+            </div>
 
             {joined && (
                 <div className="share-section" style={{ marginTop: '30px', animation: 'fadeIn 1s' }}>

@@ -333,11 +333,36 @@ class Orchestrator {
             throw new Error(`Agent ${agentId} not found`);
         }
 
+        // --- BRIDGE: SAFETY CHECK (INPUT) ---
+        if (agent.safety?.enabled) {
+            const isSafe = await this.checkSafety(instructions, 'input');
+            if (!isSafe) {
+                console.warn(`[Orchestrator] 🛡️ Safety Block (Input): ${agentId}`);
+                await BusOps.BLOCKER(agentId, taskId, "Safety violation detected in input instructions.");
+                return;
+            }
+        }
+
+        // --- BRIDGE: RAG KNOWLEDGE FETCH ---
+        let knowledgeContext = "";
+        if (agent.knowledge?.enabled) {
+            console.log(`[Orchestrator] 🧠 Fetching knowledge for ${agentId}...`);
+            const collections = agent.knowledge.collections || ['default'];
+            // Simple strategy: use full instructions as query
+            const contextChunk = await this.fetchKnowledge(instructions, collections[0]);
+            if (contextChunk) {
+                knowledgeContext = `\nRELEVANT KNOWLEDGE:\n"${contextChunk}"\n`;
+                // VISUALIZATION: Tell the bus we found knowledge
+                await BusOps.KNOWLEDGE(agentId, taskId, contextChunk.substring(0, 80) + "...");
+            }
+        }
+
         // 2. Build Context
         const context = `
 You are ${agent.name}, ${agent.title}.
 TASK ID: ${taskId}
 INSTRUCTIONS: ${instructions}
+${knowledgeContext}
 
 Your goal is to COMPLETE this task using your skills.
 If you need to ask a question, use [[QUERY: target | question]].
@@ -348,6 +373,16 @@ If you need more time/steps, simply describe what you are doing.
         // 3. Think (LLM Call)
         console.log(`[Orchestrator] ${agentId} is thinking...`);
         const response = await chat(agent.prompt?.system || `You are ${agentId}. Act professionally.`, context);
+
+        // --- BRIDGE: SAFETY CHECK (OUTPUT) ---
+        if (agent.safety?.enabled) {
+            const isSafe = await this.checkSafety(response, 'output');
+            if (!isSafe) {
+                console.warn(`[Orchestrator] 🛡️ Safety Block (Output): ${agentId}`);
+                await BusOps.BLOCKER(agentId, taskId, "I cannot generate that response due to safety guidelines.");
+                return;
+            }
+        }
 
         // 4. Act (Parse Response)
         // Check for COMPLETE
@@ -372,6 +407,47 @@ If you need more time/steps, simply describe what you are doing.
             // Auto-complete for now if simple response to avoid hanging tasks
             await BusOps.COMPLETE(agentId, taskId, response);
         }
+    }
+
+    /**
+     * Call Python Bridge for Knowledge
+     */
+    async fetchKnowledge(query, collection) {
+        try {
+            const res = await fetch('http://localhost:8000/rag/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, collection })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                return data.chunk || "";
+            }
+        } catch (err) {
+            console.warn(`[Orchestrator] RAG Bridge unavailable: ${err.message}`);
+        }
+        return "";
+    }
+
+    /**
+     * Call Python Bridge for Safety
+     */
+    async checkSafety(text, mode) {
+        try {
+            const res = await fetch('http://localhost:8000/safety/check', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, mode })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                return data.safe !== false; // Default to safe if undefined
+            }
+        } catch (err) {
+            // console.warn(`[Orchestrator] Safety Bridge unavailable: ${err.message}`);
+            return true; // Fail open if bridge is down (development mode)
+        }
+        return true;
     }
 }
 

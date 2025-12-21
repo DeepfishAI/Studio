@@ -121,8 +121,11 @@ export default function BusFeed() {
                         return emojis[id] || '🤖';
                     };
 
+                    const typeClass = msg.type === 'BLOCKER' ? 'bus-message--blocker' :
+                        msg.type === 'KNOWLEDGE' ? 'bus-message--knowledge' : '';
+
                     return (
-                        <div key={i} className={`bus-message ${isUser ? 'bus-message--user' : 'bus-message--agent'}`}>
+                        <div key={i} className={`bus-message ${isUser ? 'bus-message--user' : 'bus-message--agent'} ${typeClass}`}>
                             <div className="bus-message__avatar">
                                 {getEmoji(agentId)}
                             </div>
@@ -135,6 +138,8 @@ export default function BusFeed() {
                                     </span>
                                 </div>
                                 <div className="bus-message__text">
+                                    {msg.type === 'BLOCKER' && <span style={{ marginRight: '8px' }}>🛡️</span>}
+                                    {msg.type === 'KNOWLEDGE' && <span style={{ marginRight: '8px' }}>🧠</span>}
                                     {typeof content === 'string' ? (
                                         <ReactMarkdown>{content}</ReactMarkdown>
                                     ) : (
@@ -211,6 +216,16 @@ export default function BusFeed() {
                     color: white;
                     border-radius: 12px;
                     border-top-right-radius: 2px;
+                }
+                .bus-message--blocker .bus-message__content {
+                    background: #7f1d1d;
+                    border: 1px solid #ef4444;
+                    color: #fecaca;
+                }
+                .bus-message--knowledge .bus-message__content {
+                    background: #1e3a8a;
+                    border: 1px solid #3b82f6;
+                    color: #bfdbfe;
                 }
                 .bus-message__meta {
                     font-size: 0.75rem;

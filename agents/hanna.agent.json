@@ -24,17 +24,34 @@
             "quick_drafts": "efficient_thinker"
         }
     },
-    "model": {
-        "$comment": "Legacy fallback — skills take precedence",
-        "provider": "gemini",
-        "name": "gemini-2.5-flash-image",
-        "maxTokens": 8192,
-        "temperature": 0.8
+    "models": {
+        "best": {
+            "provider": "google",
+            "name": "gemini-1.5-pro-vision",
+            "maxTokens": 4096,
+            "temperature": 0.8,
+            "systemPromptOverlay": "$import(src/prompts/specialized/nano_banana.txt)"
+        },
+        "better": {
+            "provider": "anthropic",
+            "name": "claude-3-sonnet-20240229",
+            "maxTokens": 4096,
+            "temperature": 0.7,
+            "systemPromptOverlay": "You are running on Claude 3 Sonnet (BETTER). Be creative and descriptive."
+        },
+        "good": {
+            "provider": "google",
+            "name": "gemini-1.5-flash",
+            "maxTokens": 2048,
+            "temperature": 0.7,
+            "systemPromptOverlay": "You are running on Gemini Flash (GOOD). Quick drafts and ideas."
+        }
     },
     "tools": {
         "imageGeneration": true,
         "webSearch": false,
         "codeExecution": false,
+        "fileSystem": true,
         "voiceSynthesis": {
             "enabled": true,
             "voiceId": "fCqNx624ZlenYx5PXk6M"

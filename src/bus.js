@@ -141,6 +141,24 @@ async function saveMessage(context, message) {
  * Bus Operations
  */
 export const BusOps = {
+    // --- CUSTOM EVENT: KNOWLEDGE ---
+    KNOWLEDGE: async (agentId, taskId, snippet) => {
+        const context = await getTaskContext(taskId);
+        if (!context) return; // Silent fail
+
+        const message = {
+            type: 'KNOWLEDGE',
+            agentId,
+            taskId,
+            content: { snippet }, // Content is object
+            contextHash: context.contextHash,
+            timestamp: new Date().toISOString()
+        };
+
+        await saveMessage(context, message);
+        eventBus.emit('bus_message', message);
+        return message;
+    },
     /**
      * ASSERT - Agent states their understanding
      */

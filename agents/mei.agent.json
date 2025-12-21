@@ -10,6 +10,24 @@
         "isCore": true,
         "avatar": "/portraits/mei.png"
     },
+    "knowledge": {
+        "enabled": true,
+        "provider": "nvidia_rag",
+        "embedding": "nvidia/nv-embedqa-e5-v5",
+        "reranker": "nvidia/nv-rerankqa-mistral-4b-v3",
+        "collections": [
+            "project_history",
+            "team_capabilities",
+            "company_policies"
+        ]
+    },
+    "safety": {
+        "enabled": true,
+        "provider": "nemoguard",
+        "contentSafety": "nvidia/llama-3.1-nemoguard-8b-content-safety",
+        "jailbreakDetect": "nvidia/nemoguard-jailbreak-detect",
+        "mode": "filter"
+    },
     "skills": {
         "$catalog": "$import(../modules/skill_catalog.json)",
         "assigned": {
@@ -22,17 +40,34 @@
             "complex_planning": "power_llama"
         }
     },
-    "model": {
-        "$comment": "Legacy fallback — skills take precedence",
-        "provider": "gemini",
-        "name": "gemini-1.5-pro",
-        "maxTokens": 1000000,
-        "temperature": 0.5
+    "models": {
+        "best": {
+            "provider": "anthropic",
+            "name": "claude-3-5-sonnet-20241022",
+            "maxTokens": 4096,
+            "temperature": 0.5,
+            "systemPromptOverlay": "You are running on Claude 3.5 Sonnet (BEST). Be extremely precise and strategic."
+        },
+        "better": {
+            "provider": "gemini",
+            "name": "gemini-1.5-pro",
+            "maxTokens": 4096,
+            "temperature": 0.5,
+            "systemPromptOverlay": "You are running on Gemini 1.5 Pro (BETTER). Good balance of reasoning and speed."
+        },
+        "good": {
+            "provider": "gemini",
+            "name": "gemini-1.5-flash",
+            "maxTokens": 2048,
+            "temperature": 0.5,
+            "systemPromptOverlay": "You are running on Gemini Flash (GOOD). Prioritize speed and conciseness."
+        }
     },
     "tools": {
         "imageGeneration": false,
         "webSearch": true,
         "codeExecution": false,
+        "fileSystem": true,
         "voiceSynthesis": {
             "enabled": true,
             "voiceId": "MF3mGyEYCl7XYWbV9V6O"

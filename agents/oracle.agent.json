@@ -10,6 +10,24 @@
         "isCore": true,
         "avatar": "/portraits/oracle.png"
     },
+    "knowledge": {
+        "enabled": true,
+        "provider": "nvidia_rag",
+        "embedding": "nvidia/nv-embedqa-e5-v5",
+        "reranker": "nvidia/nv-rerankqa-mistral-4b-v3",
+        "collections": [
+            "company_docs",
+            "product_specs",
+            "architecture_patterns"
+        ]
+    },
+    "safety": {
+        "enabled": true,
+        "provider": "nemoguard",
+        "contentSafety": "nvidia/llama-3.1-nemoguard-8b-content-safety",
+        "jailbreakDetect": "nvidia/nemoguard-jailbreak-detect",
+        "mode": "filter"
+    },
     "skills": {
         "$catalog": "$import(../modules/skill_catalog.json)",
         "assigned": {
@@ -38,6 +56,19 @@
         "voiceSynthesis": {
             "enabled": true,
             "voiceId": "pNInz6obpgDQGcFmaJgB"
+        }
+    },
+    "specialCapabilities": {
+        "agentProfiler": {
+            "enabled": true,
+            "provider": "nemo_toolkit",
+            "metrics": [
+                "latency",
+                "tokens",
+                "cost",
+                "tool_usage"
+            ],
+            "dashboard": true
         }
     },
     "modules": {

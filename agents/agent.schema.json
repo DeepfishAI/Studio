@@ -39,8 +39,22 @@
         "skills": {
             "type": "object"
         },
+        "models": {
+            "type": "object",
+            "properties": {
+                "best": {
+                    "$ref": "#/definitions/modelConfig"
+                },
+                "better": {
+                    "$ref": "#/definitions/modelConfig"
+                },
+                "good": {
+                    "$ref": "#/definitions/modelConfig"
+                }
+            }
+        },
         "model": {
-            "type": "object"
+            "$ref": "#/definitions/modelConfig"
         },
         "tools": {
             "type": "object"
@@ -58,8 +72,33 @@
             "type": "object"
         }
     },
-    "required": [
-        "identity",
-        "prompt"
-    ]
+    "identity",
+    "prompt"
+],
+"definitions": {
+    "modelConfig": {
+        "type": "object",
+        "properties": {
+            "provider": {
+                "type": "string"
+            },
+            "name": {
+                "type": "string"
+            },
+            "maxTokens": {
+                "type": "integer"
+            },
+            "temperature": {
+                "type": "number"
+            },
+            "systemPromptOverlay": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "provider",
+            "name"
+        ]
+    }
+}
 }

@@ -128,6 +128,12 @@ function DashboardPage() {
                             href="https://railway.app"
                         />
                         <StatusCard
+                            icon="🧠"
+                            title="AI Cortex"
+                            subtitle="RAG & Safety"
+                            checkUrl={`${API_BASE}/api/bridge/status`}
+                        />
+                        <StatusCard
                             icon="📱"
                             title="Twilio"
                             status="online"
@@ -140,7 +146,7 @@ function DashboardPage() {
                             subtitle="TTS active"
                         />
                         <StatusCard
-                            icon="🧠"
+                            icon="🤖"
                             title="LLM"
                             status="online"
                             subtitle="Claude / Gemini"
@@ -443,8 +449,29 @@ function DashboardPage() {
     )
 }
 
-function StatusCard({ icon, title, status, subtitle, href }) {
+function StatusCard({ icon, title, status: initialStatus, subtitle, href, checkUrl }) {
     const Component = href ? 'a' : 'div';
+    const [status, setStatus] = useState(initialStatus || 'online');
+
+    useEffect(() => {
+        if (!checkUrl) return;
+
+        const checkStatus = async () => {
+            try {
+                // If it's the Cortex (Python), we expect a status JSON
+                const res = await fetch(checkUrl);
+                if (res.ok) setStatus('online');
+                else setStatus('offline');
+            } catch (e) {
+                setStatus('offline');
+            }
+        };
+
+        checkStatus();
+        const interval = setInterval(checkStatus, 10000);
+        return () => clearInterval(interval);
+    }, [checkUrl]);
+
     return (
         <Component
             className={`status-card ${status !== 'online' ? 'status-card--offline' : ''}`}
@@ -457,7 +484,7 @@ function StatusCard({ icon, title, status, subtitle, href }) {
                 <h3 className="status-card__title">{title}</h3>
                 {subtitle && <p className="status-card__subtitle">{subtitle}</p>}
             </div>
-            <div className="status-card__indicator" />
+            <div className={`status-card__indicator ${status}`} />
         </Component>
     )
 }

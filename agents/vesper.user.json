@@ -29,7 +29,7 @@
         "voiceTone": "$example: warm | professional | flirty",
         "voice": {
             "$comment": "ElevenLabs voice settings",
-            "voiceId": "pNInz6obpgDQGcFmaJgB",
+            "voiceId": "6kUBvNdOU57rLktR7BK5",
             "voiceName": "Lily",
             "provider": "elevenlabs",
             "speed": 1.0,

@@ -19,7 +19,7 @@ const ELEVENLABS_WS_URL = 'wss://api.elevenlabs.io/v1/text-to-speech';
 
 // Voice IDs for agents (same as twilio.js)
 const VOICE_IDS = {
-    vesper: 'pNInz6obpgDQGcFmaJgB',
+    vesper: 'GCPLhb1XrVwcoKUJYcvz',
     mei: '1a0nAYA3FcNQcMMfbddY',
     hanna: 'XB0fDUnXU5powFXDhCwa',
     it: 'onwK4e9ZLuTAKqWW03F9',

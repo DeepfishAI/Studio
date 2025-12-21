@@ -68,7 +68,7 @@ export function isElevenLabsEnabled() {
 
 // ElevenLabs voice IDs for each agent
 const ELEVENLABS_VOICES = {
-    vesper: 'pNInz6obpgDQGcFmaJgB',   // Lily - warm, professional
+    vesper: 'GCPLhb1XrVwcoKUJYcvz',   // Custom Vesper voice
     mei: '1a0nAYA3FcNQcMMfbddY',      // Chinese-accented female (from Voice Library)
     hanna: 'XB0fDUnXU5powFXDhCwa',    // Charlotte - thoughtful, creative
     it: 'onwK4e9ZLuTAKqWW03F9',       // Daniel - technical, calm

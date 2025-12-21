@@ -1,285 +1,477 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { agents } from '../data/agents'
 import BusFeed from '../components/BusFeed'
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 function DashboardPage() {
     const { user } = useAuth()
-    const [showLogs, setShowLogs] = useState(false)
+    const [greeting, setGreeting] = useState('Hello')
+
+    useEffect(() => {
+        const hour = new Date().getHours()
+        if (hour < 12) setGreeting('Good morning')
+        else if (hour < 17) setGreeting('Good afternoon')
+        else setGreeting('Good evening')
+    }, [])
 
     return (
-        <div className="dashboard-page">
+        <div className="dashboard-eleven">
             {/* Header */}
-            <div className="dashboard__header">
-                <h1 className="dashboard__greeting">
-                    Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}! 👋
-                </h1>
-                <p className="dashboard__subtitle">
-                    Your AI team is ready to help. What would you like to work on today?
-                </p>
+            <div className="dash-header">
+                <div className="dash-header__left">
+                    <span className="dash-header__workspace">My Workspace</span>
+                    <h1 className="dash-header__greeting">
+                        {greeting}, {user?.email ? user.email.split('@')[0] : 'there'} 🐟
+                    </h1>
+                </div>
+                <div className="dash-header__right">
+                    <span className="dash-header__question">Need help?</span>
+                    <Link to="/app/chat/vesper" className="dash-header__cta">
+                        <span className="cta-icon">📞</span>
+                        Call Vesper
+                    </Link>
+                </div>
             </div>
 
-            {/* Quick Actions */}
-            <div className="dashboard__section">
-                <div className="dashboard__section-header">
-                    <h2 className="dashboard__section-title">Quick Actions</h2>
-                    <button
-                        onClick={() => setShowLogs(!showLogs)}
-                        className="btn btn--ghost btn--sm"
-                        style={{ marginLeft: 'auto' }}
+            {/* Agent Cards Row - ElevenLabs Style */}
+            <div className="agents-row">
+                {agents.map(agent => (
+                    <Link
+                        key={agent.id}
+                        to={`/app/chat/${agent.id}`}
+                        className={`agent-tile agent-tile--${agent.id}`}
                     >
-                        {showLogs ? '✕ Close Logs' : '📋 View Logs'}
-                    </button>
-                </div>
-
-                {/* Logs Panel */}
-                {showLogs && <LogsViewer />}
-
-                <div className="quick-actions">
-                    <Link to="/app/chat/mei" className="quick-action-card">
-                        <div className="quick-action-card__icon">💬</div>
-                        <h3 className="quick-action-card__title">New Project</h3>
-                        <p className="quick-action-card__desc">
-                            Start a conversation with Mei
-                        </p>
-                    </Link>
-                    <Link to="/app/agents" className="quick-action-card">
-                        <div className="quick-action-card__icon">👥</div>
-                        <h3 className="quick-action-card__title">Meet the Team</h3>
-                        <p className="quick-action-card__desc">
-                            Explore agent profiles
-                        </p>
-                    </Link>
-                    <Link to="/app/chat/hanna" className="quick-action-card">
-                        <div className="quick-action-card__icon">🎨</div>
-                        <h3 className="quick-action-card__title">Design Something</h3>
-                        <p className="quick-action-card__desc">
-                            Work with Hanna
-                        </p>
-                    </Link>
-                    <Link to="/app/chat/it" className="quick-action-card">
-                        <div className="quick-action-card__icon">💻</div>
-                        <h3 className="quick-action-card__title">Build Code</h3>
-                        <p className="quick-action-card__desc">
-                            Get IT's expertise
-                        </p>
-                    </Link>
-                </div>
-            </div>
-
-            {/* Team Status */}
-            <div className="dashboard__section">
-                <div className="dashboard__section-header">
-                    <h2 className="dashboard__section-title">Your Team</h2>
-                    <Link to="/app/agents" className="btn btn--ghost btn--sm">
-                        View All →
-                    </Link>
-                </div>
-                <div className="agents-grid">
-                    {agents.slice(0, 4).map(agent => (
-                        <div key={agent.id} className={`agent-card agent-card--${agent.id}`}>
-                            <div className="agent-card__header">
-                                <img
-                                    src={agent.portrait}
-                                    alt={agent.name}
-                                    className="agent-card__avatar"
-                                />
-                                <div className="agent-card__info">
-                                    <h3 className="agent-card__name">{agent.name}</h3>
-                                    <p className="agent-card__title">{agent.title}</p>
-                                </div>
-                            </div>
-                            <p className="agent-card__desc">
-                                {agent.description?.substring(0, 100)}...
-                            </p>
-                            <div className="agent-card__actions">
-                                <Link to={`/app/chat/${agent.id}`} className="btn btn--primary btn--sm">
-                                    💬 Chat
-                                </Link>
-                                <Link to={`/app/agents/${agent.id}`} className="btn btn--secondary btn--sm">
-                                    Profile
-                                </Link>
+                        <div className="agent-tile__icon">
+                            <img
+                                src={agent.portrait}
+                                alt={agent.name}
+                                className="agent-tile__portrait"
+                                onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'flex';
+                                }}
+                            />
+                            <div className="agent-tile__fallback" style={{ display: 'none' }}>
+                                {getAgentEmoji(agent.id)}
                             </div>
                         </div>
-                    ))}
+                        <span className="agent-tile__name">{agent.name}</span>
+                    </Link>
+                ))}
+            </div>
+
+            {/* Two Column Layout */}
+            <div className="dash-columns">
+                {/* Left Column: Gadgets & Latest */}
+                <div className="dash-column dash-column--left">
+                    <h2 className="column-title">Quick Start</h2>
+
+                    <div className="gadget-list">
+                        <Link to="/app/chat/mei" className="gadget-item">
+                            <div className="gadget-item__icon">💼</div>
+                            <div className="gadget-item__content">
+                                <h3 className="gadget-item__title">New Project</h3>
+                                <p className="gadget-item__desc">Start a project with Mei</p>
+                            </div>
+                        </Link>
+
+                        <Link to="/app/chat/hanna" className="gadget-item">
+                            <div className="gadget-item__icon">🎨</div>
+                            <div className="gadget-item__content">
+                                <h3 className="gadget-item__title">Design Assets</h3>
+                                <p className="gadget-item__desc">Create visuals with Hanna</p>
+                            </div>
+                        </Link>
+
+                        <Link to="/app/chat/it" className="gadget-item">
+                            <div className="gadget-item__icon">💻</div>
+                            <div className="gadget-item__content">
+                                <h3 className="gadget-item__title">Build Code</h3>
+                                <p className="gadget-item__desc">Get IT's expertise</p>
+                            </div>
+                        </Link>
+
+                        <Link to="/app/chat/sally" className="gadget-item">
+                            <div className="gadget-item__icon">📈</div>
+                            <div className="gadget-item__content">
+                                <h3 className="gadget-item__title">Marketing Strategy</h3>
+                                <p className="gadget-item__desc">Grow with Sally</p>
+                            </div>
+                        </Link>
+
+                        <Link to="/app/chat/oracle" className="gadget-item">
+                            <div className="gadget-item__icon">🔮</div>
+                            <div className="gadget-item__content">
+                                <h3 className="gadget-item__title">Strategic Insight</h3>
+                                <p className="gadget-item__desc">Consult the Oracle</p>
+                            </div>
+                        </Link>
+                    </div>
+
+                    <Link to="/app/agents" className="explore-link">
+                        Explore all agents →
+                    </Link>
+                </div>
+
+                {/* Right Column: Status & Locations */}
+                <div className="dash-column dash-column--right">
+                    <h2 className="column-title">System Status</h2>
+
+                    <div className="status-grid">
+                        <StatusCard
+                            icon="🌐"
+                            title="Railway"
+                            status="online"
+                            href="https://railway.app"
+                        />
+                        <StatusCard
+                            icon="📱"
+                            title="Twilio"
+                            status="online"
+                            subtitle="Voice ready"
+                        />
+                        <StatusCard
+                            icon="🔊"
+                            title="ElevenLabs"
+                            status="online"
+                            subtitle="TTS active"
+                        />
+                        <StatusCard
+                            icon="🧠"
+                            title="LLM"
+                            status="online"
+                            subtitle="Claude / Gemini"
+                        />
+                    </div>
+
+                    <h2 className="column-title" style={{ marginTop: '24px' }}>Quick Access</h2>
+                    <div className="quick-links">
+                        <a href="https://console.twilio.com" target="_blank" rel="noreferrer" className="quick-link">
+                            <span className="quick-link__icon">📞</span>
+                            Twilio Console
+                        </a>
+                        <a href="https://elevenlabs.io/app" target="_blank" rel="noreferrer" className="quick-link">
+                            <span className="quick-link__icon">🎙️</span>
+                            ElevenLabs
+                        </a>
+                        <a href="https://github.com/DeepfishAI/studio" target="_blank" rel="noreferrer" className="quick-link">
+                            <span className="quick-link__icon">🐙</span>
+                            GitHub Repo
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            {/* Live Operations Feed */}
-            <BusFeed />
-
-            {/* Project History & Deliverables */}
-            <div className="dashboard__section" style={{ marginTop: '40px' }}>
-                <div className="dashboard__section-header">
-                    <h2 className="dashboard__section-title">Project History & Deliverables</h2>
-                </div>
-                <ProjectHistoryList />
+            {/* Office Communications Bus */}
+            <div className="dash-section">
+                <BusFeed />
             </div>
+
+            {/* Styles */}
+            <style>{`
+                .dashboard-eleven {
+                    max-width: 1400px;
+                    margin: 0 auto;
+                    padding: 30px;
+                }
+
+                /* Header */
+                .dash-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    margin-bottom: 32px;
+                }
+                .dash-header__workspace {
+                    display: block;
+                    font-size: 0.85rem;
+                    color: #8b9bb4;
+                    margin-bottom: 4px;
+                }
+                .dash-header__greeting {
+                    font-size: 1.75rem;
+                    font-weight: 600;
+                    color: #fff;
+                    margin: 0;
+                }
+                .dash-header__right {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .dash-header__question {
+                    font-size: 0.9rem;
+                    color: #8b9bb4;
+                }
+                .dash-header__cta {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: #252a36;
+                    border: 1px solid #3d4452;
+                    padding: 10px 16px;
+                    border-radius: 24px;
+                    color: #fff;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                }
+                .dash-header__cta:hover {
+                    background: #FF3366;
+                    border-color: #FF3366;
+                }
+                .cta-icon {
+                    background: #FF3366;
+                    padding: 4px 8px;
+                    border-radius: 16px;
+                    font-size: 0.8rem;
+                }
+
+                /* Agent Tiles Row */
+                .agents-row {
+                    display: flex;
+                    gap: 16px;
+                    margin-bottom: 40px;
+                    overflow-x: auto;
+                    padding-bottom: 8px;
+                }
+                .agent-tile {
+                    flex: 0 0 auto;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 20px 24px;
+                    background: #1a1d24;
+                    border: 1px solid #2d3342;
+                    border-radius: 16px;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                    min-width: 120px;
+                }
+                .agent-tile:hover {
+                    background: #252a36;
+                    border-color: #3d4452;
+                    transform: translateY(-2px);
+                }
+                .agent-tile--vesper:hover { border-color: #FF3366; }
+                .agent-tile--mei:hover { border-color: #3b82f6; }
+                .agent-tile--hanna:hover { border-color: #f59e0b; }
+                .agent-tile--it:hover { border-color: #10b981; }
+                .agent-tile--sally:hover { border-color: #a855f7; }
+                .agent-tile--oracle:hover { border-color: #06b6d4; }
+                
+                .agent-tile__icon {
+                    width: 56px;
+                    height: 56px;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    background: #252a36;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .agent-tile__portrait {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+                .agent-tile__fallback {
+                    font-size: 1.5rem;
+                }
+                .agent-tile__name {
+                    color: #d1d5db;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                }
+
+                /* Two Column Layout */
+                .dash-columns {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 32px;
+                    margin-bottom: 32px;
+                }
+                @media (max-width: 900px) {
+                    .dash-columns { grid-template-columns: 1fr; }
+                }
+                .column-title {
+                    font-size: 1rem;
+                    font-weight: 600;
+                    color: #fff;
+                    margin: 0 0 16px 0;
+                }
+
+                /* Gadget List (Left Column) */
+                .gadget-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+                .gadget-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    padding: 14px 16px;
+                    background: #1a1d24;
+                    border: 1px solid #2d3342;
+                    border-radius: 12px;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                }
+                .gadget-item:hover {
+                    background: #252a36;
+                    border-color: #FF3366;
+                }
+                .gadget-item__icon {
+                    font-size: 1.5rem;
+                    width: 48px;
+                    height: 48px;
+                    background: #252a36;
+                    border-radius: 10px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .gadget-item__title {
+                    color: #fff;
+                    font-size: 0.95rem;
+                    font-weight: 500;
+                    margin: 0 0 4px 0;
+                }
+                .gadget-item__desc {
+                    color: #8b9bb4;
+                    font-size: 0.8rem;
+                    margin: 0;
+                }
+                .explore-link {
+                    display: inline-block;
+                    margin-top: 16px;
+                    color: #8b9bb4;
+                    font-size: 0.9rem;
+                    text-decoration: none;
+                    transition: color 0.2s;
+                }
+                .explore-link:hover {
+                    color: #FF3366;
+                }
+
+                /* Status Grid (Right Column) */
+                .status-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 12px;
+                }
+                .status-card {
+                    background: #1a1d24;
+                    border: 1px solid #2d3342;
+                    border-radius: 12px;
+                    padding: 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                }
+                .status-card:hover {
+                    background: #252a36;
+                }
+                .status-card__icon {
+                    font-size: 1.5rem;
+                }
+                .status-card__content {
+                    flex: 1;
+                }
+                .status-card__title {
+                    color: #fff;
+                    font-size: 0.9rem;
+                    font-weight: 500;
+                    margin: 0 0 2px 0;
+                }
+                .status-card__subtitle {
+                    color: #6b7280;
+                    font-size: 0.75rem;
+                    margin: 0;
+                }
+                .status-card__indicator {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: #10b981;
+                }
+                .status-card--offline .status-card__indicator {
+                    background: #ef4444;
+                }
+
+                /* Quick Links */
+                .quick-links {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 8px;
+                }
+                .quick-link {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px 16px;
+                    background: #1a1d24;
+                    border: 1px solid #2d3342;
+                    border-radius: 10px;
+                    color: #d1d5db;
+                    font-size: 0.9rem;
+                    text-decoration: none;
+                    transition: all 0.2s;
+                }
+                .quick-link:hover {
+                    background: #252a36;
+                    color: #fff;
+                }
+                .quick-link__icon {
+                    font-size: 1.1rem;
+                }
+
+                /* Section */
+                .dash-section {
+                    margin-top: 16px;
+                }
+            `}</style>
         </div>
     )
 }
 
-function ProjectHistoryList() {
-    const [projects, setProjects] = React.useState([]);
-    const [loading, setLoading] = React.useState(true);
-    const API_BASE = import.meta.env.VITE_API_URL || '';
-
-    React.useEffect(() => {
-        fetch(`${API_BASE}/api/projects`)
-            .then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.json();
-            })
-            .then(data => {
-                if (data.success) setProjects(data.projects || []);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error("[ProjectHistory] Failed to load:", err);
-                setLoading(false);
-            });
-    }, []);
-
-    if (loading) return <div>Loading history...</div>;
-    if (projects.length === 0) return <div className="text-gray-500">No projects recorded yet.</div>;
-
+function StatusCard({ icon, title, status, subtitle, href }) {
+    const Component = href ? 'a' : 'div';
     return (
-        <div className="history-list">
-            {projects.map(p => (
-                <div key={p.id} className={`history-item history-item--${p.status}`}>
-                    <div className="history-item__header">
-                        <span className={`tag tag--${p.status}`}>{p.status.toUpperCase()}</span>
-                        <span className="history-item__date">{new Date(p.created).toLocaleString()}</span>
-                    </div>
-                    <div className="history-item__body">
-                        <strong>{p.request}</strong>
-                        {p.deliverable && (
-                            <div className="history-item__deliverable">
-                                <span className="icon">📦</span>
-                                <span className="content">{p.deliverable.substring(0, 100)}...</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="history-item__footer">
-                        Assigned: {p.agent || 'Unassigned'}
-                    </div>
-                </div>
-            ))}
-            <style>{`
-                .history-list { display: grid; gap: 15px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-                .history-item { background: #1a1d24; border: 1px solid #2d3342; padding: 15px; border-radius: 8px; }
-                .history-item--completed { border-color: #10b981; }
-                .history-item__header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.8rem; color: #8b9bb4; }
-                .history-item__body { margin-bottom: 10px; }
-                .history-item__deliverable { margin-top: 8px; background: #252a36; padding: 8px; border-radius: 4px; font-size: 0.9rem; font-family: monospace; }
-                .history-item__footer { font-size: 0.8rem; color: #6b7280; }
-                .tag--completed { color: #10b981; }
-                .tag--active { color: #3b82f6; }
-            `}</style>
-        </div>
-    );
+        <Component
+            className={`status-card ${status !== 'online' ? 'status-card--offline' : ''}`}
+            href={href}
+            target={href ? '_blank' : undefined}
+            rel={href ? 'noreferrer' : undefined}
+        >
+            <div className="status-card__icon">{icon}</div>
+            <div className="status-card__content">
+                <h3 className="status-card__title">{title}</h3>
+                {subtitle && <p className="status-card__subtitle">{subtitle}</p>}
+            </div>
+            <div className="status-card__indicator" />
+        </Component>
+    )
 }
 
-// Logs Viewer Component
-function LogsViewer() {
-    const [logs, setLogs] = React.useState([]);
-    const [tasks, setTasks] = React.useState([]);
-    const [loading, setLoading] = React.useState(true);
-    const [activeTab, setActiveTab] = React.useState('logs');
-    const API_BASE = import.meta.env.VITE_API_URL || '';
-
-    React.useEffect(() => {
-        Promise.all([
-            fetch(`${API_BASE}/api/logs?limit=50`).then(r => r.json()),
-            fetch(`${API_BASE}/api/tasks`).then(r => r.json())
-        ])
-            .then(([logsData, tasksData]) => {
-                setLogs(logsData.logs || []);
-                setTasks(tasksData.tasks || []);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error('[LogsViewer] Error:', err);
-                setLoading(false);
-            });
-    }, []);
-
-    if (loading) return <div className="logs-loading">Loading logs...</div>;
-
-    return (
-        <div className="logs-viewer">
-            <div className="logs-tabs">
-                <button
-                    className={`logs-tab ${activeTab === 'logs' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('logs')}
-                >
-                    📋 Messages ({logs.length})
-                </button>
-                <button
-                    className={`logs-tab ${activeTab === 'tasks' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('tasks')}
-                >
-                    📦 Tasks ({tasks.length})
-                </button>
-            </div>
-
-            {activeTab === 'logs' && (
-                <div className="logs-list">
-                    {logs.length === 0 ? (
-                        <div className="logs-empty">No messages yet. Start a project via chat or phone!</div>
-                    ) : logs.map((log, i) => (
-                        <div key={i} className={`log-item log-item--${log.operation?.toLowerCase()}`}>
-                            <div className="log-header">
-                                <span className="log-op">{log.operation}</span>
-                                <span className="log-from">{log.from} → {log.to || 'system'}</span>
-                                <span className="log-time">{new Date(log.timestamp).toLocaleTimeString()}</span>
-                            </div>
-                            <div className="log-content">{log.content?.substring(0, 200)}</div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {activeTab === 'tasks' && (
-                <div className="logs-list">
-                    {tasks.length === 0 ? (
-                        <div className="logs-empty">No tasks recorded yet.</div>
-                    ) : tasks.map((task, i) => (
-                        <div key={i} className={`log-item log-item--task`}>
-                            <div className="log-header">
-                                <span className={`log-status status--${task.status}`}>{task.status}</span>
-                                <span className="log-time">{new Date(task.createdAt).toLocaleString()}</span>
-                            </div>
-                            <div className="log-content">{task.originalRequest}</div>
-                            <div className="log-meta">{task.messageCount} messages</div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            <style>{`
-                .logs-viewer { background: #12151a; border: 1px solid #2d3342; border-radius: 8px; margin-bottom: 20px; max-height: 400px; overflow: hidden; display: flex; flex-direction: column; }
-                .logs-tabs { display: flex; border-bottom: 1px solid #2d3342; }
-                .logs-tab { flex: 1; padding: 10px; background: none; border: none; color: #8b9bb4; cursor: pointer; }
-                .logs-tab.active { background: #1a1d24; color: #fff; border-bottom: 2px solid #3b82f6; }
-                .logs-list { overflow-y: auto; max-height: 340px; padding: 10px; }
-                .logs-loading, .logs-empty { padding: 20px; text-align: center; color: #6b7280; }
-                .log-item { background: #1a1d24; border: 1px solid #2d3342; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 0.85rem; }
-                .log-item--assert { border-left: 3px solid #3b82f6; }
-                .log-item--handoff { border-left: 3px solid #f59e0b; }
-                .log-item--complete { border-left: 3px solid #10b981; }
-                .log-item--blocker { border-left: 3px solid #ef4444; }
-                .log-header { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 0.75rem; color: #8b9bb4; }
-                .log-op { background: #252a36; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
-                .log-from { flex: 1; }
-                .log-content { color: #d1d5db; word-break: break-word; }
-                .log-meta { margin-top: 6px; font-size: 0.75rem; color: #6b7280; }
-                .status--active { color: #3b82f6; }
-                .status--completed { color: #10b981; }
-            `}</style>
-        </div>
-    );
+function getAgentEmoji(agentId) {
+    const emojis = {
+        vesper: '📞',
+        mei: '📋',
+        hanna: '🎨',
+        it: '💻',
+        sally: '📈',
+        oracle: '🔮'
+    };
+    return emojis[agentId] || '🤖';
 }
 
 export default DashboardPage

@@ -1,5 +1,5 @@
 // API service for communicating with backend
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 export const api = {
     /**

@@ -128,7 +128,7 @@ function ChatPage() {
     const playVoice = async (text, agentId) => {
         try {
             const { url } = await api.generateTts(text, agentId)
-            const audioUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${url}`
+            const audioUrl = `${import.meta.env.VITE_API_URL || ''}${url}`
 
             // Stop current audio if playing
             audioRef.current.pause()

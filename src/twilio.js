@@ -27,6 +27,14 @@ const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 
+export function isTwilioEnabled() {
+    return !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN);
+}
+
+export function isElevenLabsEnabled() {
+    return !!ELEVENLABS_API_KEY;
+}
+
 // ElevenLabs voice IDs for each agent
 const ELEVENLABS_VOICES = {
     vesper: 'pNInz6obpgDQGcFmaJgB',   // Lily - warm, professional

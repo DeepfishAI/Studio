@@ -185,6 +185,11 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/voice', voiceRoutes); // includes /incoming, /route, /agent/:id, /audio/:id, /tts
 app.use('/api/training', trainingRoutes);
 
+// TERMINAL ALIASES (For legacy Twilio Configuration)
+// If Twilio is pointing to /incoming instead of /api/voice/incoming
+app.post('/incoming', handleIncomingCall);
+app.post('/webhook', handleIncomingCall);
+
 // OLD: /api/agents (Moved to chat router logic or keep simple here?
 // The chat router handles /api/chat/agents? No, API.js calls /api/agents.
 // Let's keep /api/agents here or alias it to chat router if it has it.

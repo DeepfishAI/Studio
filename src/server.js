@@ -153,7 +153,12 @@ import trainingRoutes from './routes/training.js';
 // app.set('redis', redis); happens after app init
 
 // ... (Middleware)
-app.use(cors());
+const frontendUrl = process.env.FRONTEND_URL || '*';
+app.use(cors({
+    origin: frontendUrl,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret']
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

@@ -84,6 +84,8 @@ export const api = {
             }
             return response.json()
         } catch (error) {
+            console.error('[API] Health check failed:', error);
+            // Check if it's a network error vs 404
             return { status: 'offline', error: error.message }
         }
     },

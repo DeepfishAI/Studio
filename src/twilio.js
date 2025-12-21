@@ -10,6 +10,7 @@ import { getAgent } from './agent.js';
 import { isLlmAvailable } from './llm.js';
 import { Vesper } from './vesper.js';
 import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { eventBus } from './bus.js';
 

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import LandingPage from './pages/LandingPage'
@@ -20,18 +20,40 @@ import AdminPage from './pages/AdminPage'
 
 function ProtectedRoute({ children }) {
     const { user, loading } = useAuth()
-    const navigate = useNavigate()
 
-    // Redirect to landing page on refresh
+    if (loading) {
+        return (
+            <div className="loading-screen">
+                <div className="loading-spinner"></div>
+                <p>Loading...</p>
+            </div>
+        )
+    }
+
+    if (!user) {
+        return <Navigate to="/login" replace />
+    }
+
+    return children
+}
+
+function AppRoutes() {
+    const { user, loading } = useAuth()
+    const navigate = useNavigate()
+    const location = useLocation()
+
+    // Redirect to landing page on refresh (but not if already on landing)
     useEffect(() => {
+        if (location.pathname === '/') return // Already on landing, skip
+
         const navEntries = performance.getEntriesByType('navigation')
-        if (navEntries.length > 0 && navEntries[0].type === 'reload') {
-            navigate('/')
-        } else if (window.performance && window.performance.navigation.type === 1) {
-            // Fallback for older browsers
-            navigate('/')
+        const isReload = (navEntries.length > 0 && navEntries[0].type === 'reload') ||
+            (window.performance && window.performance.navigation?.type === 1)
+
+        if (isReload) {
+            navigate('/', { replace: true })
         }
-    }, [navigate])
+    }, []) // Run once on mount
 
     if (loading) {
         return (

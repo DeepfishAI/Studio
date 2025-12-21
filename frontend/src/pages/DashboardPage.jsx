@@ -130,7 +130,7 @@ function DashboardPage() {
                         <StatusCard
                             icon="🧠"
                             title="AI Cortex"
-                            subtitle="Local Dev Only"
+                            subtitle="NVIDIA RAG"
                             checkUrl={`${API_BASE}/api/bridge/status`}
                         />
                         <StatusCard

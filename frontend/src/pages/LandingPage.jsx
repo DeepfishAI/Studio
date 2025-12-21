@@ -201,7 +201,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="hero-subtitle">
-                You don't need another chatbot. You need a department.
+                You don't need another chatbot. You need a workgroup.
                 <br />
                 Spin up autonomous specialists, assign real work, and scale your creative output.
             </p>

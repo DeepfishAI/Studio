@@ -8,6 +8,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 import { Vesper } from './vesper.js';
 import { Mei } from './mei.js';
 import { getAgent } from './agent.js';

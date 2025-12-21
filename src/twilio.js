@@ -208,6 +208,39 @@ export async function sendSms(to, body) {
         return false;
     }
 }
+}
+
+/**
+ * Make an outbound call
+ * @param {string} to - Phone number to call
+ * @param {string} message - Text to say
+ */
+export async function makeCall(to, message) {
+    const client = getTwilioClient();
+    const from = process.env.TWILIO_PHONE_NUMBER;
+
+    if (!client || !from) return false;
+
+    try {
+        // TwiML for the call
+        const twiml = new VoiceResponse();
+        twiml.pause({ length: 1 });
+        twiml.say({ voice: 'Polly.Aditi' }, "Attention. This is a priority update from DeepFish.");
+        twiml.pause({ length: 1 });
+        twiml.say({ voice: 'Polly.Joanna' }, message);
+
+        await client.calls.create({
+            twiml: twiml.toString(),
+            to,
+            from
+        });
+        console.log(`[Twilio] Call initiated to ${to}`);
+        return true;
+    } catch (err) {
+        console.error(`[Twilio] Call failed: ${err.message}`);
+        return false;
+    }
+}
 
 /**
  * Get base URL for audio serving

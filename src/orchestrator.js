@@ -7,7 +7,7 @@
 
 import { eventBus, getTaskContext, updateTaskStatus, getActiveTasks, BusOps } from './bus.js';
 import { spawnIntern, spawnInternTeam, getActiveInterns } from './interns.js';
-import { sendSms } from './twilio.js';
+import { sendSms, makeCall } from './twilio.js';
 import { chat } from './llm.js';
 import { getAgent } from './agent.js';
 
@@ -145,190 +145,198 @@ class Orchestrator {
         handlers.forEach(h => h({ agentId, toAgentId, taskId, content }));
     }
 
-    /**
-     * Called when an agent is blocked
-     */
-    onBlocker({ agentId, taskId, content }) {
-        this.wake(`Agent ${agentId} is blocked`);
-        console.log(`[Orchestrator] BLOCKER from ${agentId}: ${content}`);
+import { makeCall } from './twilio.js';
 
-        // Mark task as blocked
-        const task = this.pendingTasks.get(taskId);
-        if (task) {
-            task.status = 'blocked';
-            task.blocker = content;
-        }
+// ...
 
-        // This would typically escalate to Mei or user
-        const handlers = this.handlers.get('blocker') || [];
-        handlers.forEach(h => h({ agentId, taskId, content }));
+/**
+ * Called when an agent is blocked
+ */
+onBlocker({ agentId, taskId, content }) {
+    this.wake(`Agent ${agentId} is blocked`);
+    console.log(`[Orchestrator] BLOCKER from ${agentId}: ${content}`);
+
+    // Mark task as blocked
+    const task = this.pendingTasks.get(taskId);
+    if (task) {
+        task.status = 'blocked';
+        task.blocker = content;
     }
 
-    /**
-     * Called when validation happens
-     */
-    onValidate({ agentId, taskId, approved }) {
-        console.log(`[Orchestrator] Validation by ${agentId}: ${approved ? 'APPROVED' : 'REJECTED'}`);
+    // 🚨 CALL USER IMMEDIATELY 🚨
+    const message = `Agent ${agentId} is blocked on task ${taskId.split('_')[1] || 'Unknown'}. Reason: ${content}`;
+    makeCall(ADMIN_PHONE, message).catch(err => console.error('[Orchestrator] Failed to make blocker call:', err));
 
-        if (!approved) {
-            this.wake(`Validation rejected for task ${taskId}`);
-        }
+    // This would typically escalate to Mei or user
+    const handlers = this.handlers.get('blocker') || [];
+    handlers.forEach(h => h({ agentId, taskId, content }));
+}
+
+/**
+ * Called when validation happens
+ */
+onValidate({ agentId, taskId, approved }) {
+    console.log(`[Orchestrator] Validation by ${agentId}: ${approved ? 'APPROVED' : 'REJECTED'}`);
+
+    if (!approved) {
+        this.wake(`Validation rejected for task ${taskId}`);
     }
+}
 
-    /**
-     * Called when an agent queries
-     */
-    onQuery({ agentId, taskId, content, targetAgents }) {
-        console.log(`[Orchestrator] Query from ${agentId} to ${targetAgents.join(', ') || 'all'}`);
-    }
+/**
+ * Called when an agent queries
+ */
+onQuery({ agentId, taskId, content, targetAgents }) {
+    console.log(`[Orchestrator] Query from ${agentId} to ${targetAgents.join(', ') || 'all'}`);
+}
 
-    /**
-     * Called when an agent corrects another
-     */
-    onCorrect({ agentId, taskId, content, targetAgent }) {
-        this.wake(`Correction from ${agentId} to ${targetAgent}`);
-        console.log(`[Orchestrator] Correction: ${agentId} → ${targetAgent}`);
-    }
+/**
+ * Called when an agent corrects another
+ */
+onCorrect({ agentId, taskId, content, targetAgent }) {
+    this.wake(`Correction from ${agentId} to ${targetAgent}`);
+    console.log(`[Orchestrator] Correction: ${agentId} → ${targetAgent}`);
+}
 
-    // ==========================================
-    // INTERN MANAGEMENT
-    // ==========================================
+// ==========================================
+// INTERN MANAGEMENT
+// ==========================================
 
-    /**
-     * Called when an intern is spawned
-     */
-    onInternSpawn({ internId, type, managerId, task }) {
-        console.log(`[Orchestrator] Intern spawned: ${type} for ${managerId}`);
-    }
+/**
+ * Called when an intern is spawned
+ */
+onInternSpawn({ internId, type, managerId, task }) {
+    console.log(`[Orchestrator] Intern spawned: ${type} for ${managerId}`);
+}
 
-    /**
-     * Called when an intern completes their work
-     */
-    onInternComplete({ internId, managerId, deliverable }) {
-        console.log(`[Orchestrator] Intern ${internId.slice(0, 8)} completed`);
+/**
+ * Called when an intern completes their work
+ */
+onInternComplete({ internId, managerId, deliverable }) {
+    console.log(`[Orchestrator] Intern ${internId.slice(0, 8)} completed`);
 
-        // Store deliverable
-        // In a full implementation, we'd match this to a taskId
-    }
+    // Store deliverable
+    // In a full implementation, we'd match this to a taskId
+}
 
-    /**
-     * Called when an intern fails
-     */
-    onInternFailed({ internId, managerId, error }) {
-        this.wake(`Intern ${internId.slice(0, 8)} failed: ${error}`);
-        console.error(`[Orchestrator] Intern failed: ${error}`);
-    }
+/**
+ * Called when an intern fails
+ */
+onInternFailed({ internId, managerId, error }) {
+    this.wake(`Intern ${internId.slice(0, 8)} failed: ${error}`);
+    console.error(`[Orchestrator] Intern failed: ${error}`);
+}
 
     /**
      * Dispatch a single intern to perform a task
      */
     async dispatchIntern(managerId, internType, task, options = {}) {
-        console.log(`[Orchestrator] ${managerId} dispatching ${internType} intern`);
+    console.log(`[Orchestrator] ${managerId} dispatching ${internType} intern`);
 
-        try {
-            const deliverable = await spawnIntern(internType, task, {
-                managerId,
-                ...options
-            });
-            return deliverable;
-        } catch (error) {
-            console.error(`[Orchestrator] Intern dispatch failed:`, error);
-            throw error;
-        }
+    try {
+        const deliverable = await spawnIntern(internType, task, {
+            managerId,
+            ...options
+        });
+        return deliverable;
+    } catch (error) {
+        console.error(`[Orchestrator] Intern dispatch failed:`, error);
+        throw error;
     }
+}
 
     /**
      * Dispatch multiple interns in parallel
      */
     async dispatchInternTeam(managerId, tasks) {
-        console.log(`[Orchestrator] ${managerId} dispatching team of ${tasks.length} interns`);
+    console.log(`[Orchestrator] ${managerId} dispatching team of ${tasks.length} interns`);
 
-        const tasksWithManager = tasks.map(t => ({
-            ...t,
-            options: { ...t.options, managerId }
-        }));
+    const tasksWithManager = tasks.map(t => ({
+        ...t,
+        options: { ...t.options, managerId }
+    }));
 
-        const results = await spawnInternTeam(tasksWithManager);
-        return results;
-    }
+    const results = await spawnInternTeam(tasksWithManager);
+    return results;
+}
 
-    /**
-     * Get status of all pending tasks
-     */
-    getStatus() {
-        const status = {
-            sleeping: this.sleeping,
-            pendingTasks: [],
-            activeTasks: getActiveTasks(),
-            activeInterns: getActiveInterns()
-        };
+/**
+ * Get status of all pending tasks
+ */
+getStatus() {
+    const status = {
+        sleeping: this.sleeping,
+        pendingTasks: [],
+        activeTasks: getActiveTasks(),
+        activeInterns: getActiveInterns()
+    };
 
-        this.pendingTasks.forEach((task, taskId) => {
-            status.pendingTasks.push({
-                taskId,
-                ...task
-            });
+    this.pendingTasks.forEach((task, taskId) => {
+        status.pendingTasks.push({
+            taskId,
+            ...task
         });
+    });
 
-        return status;
+    return status;
+}
+
+/**
+ * Dispatch a task to an agent
+ */
+dispatchToAgent(taskId, agentId, workPackage) {
+    console.log(`[Orchestrator] Dispatching task ${taskId} to ${agentId}`);
+
+    // Record the handoff from Mei
+    BusOps.HANDOFF('mei', agentId, taskId, workPackage);
+
+    // Update task status
+    const task = this.pendingTasks.get(taskId);
+    if (task) {
+        task.status = 'in_progress';
+        task.assignedTo = agentId;
     }
 
-    /**
-     * Dispatch a task to an agent
-     */
-    dispatchToAgent(taskId, agentId, workPackage) {
-        console.log(`[Orchestrator] Dispatching task ${taskId} to ${agentId}`);
-
-        // Record the handoff from Mei
-        BusOps.HANDOFF('mei', agentId, taskId, workPackage);
-
-        // Update task status
-        const task = this.pendingTasks.get(taskId);
-        if (task) {
-            task.status = 'in_progress';
-            task.assignedTo = agentId;
-        }
-
-        // Go to sleep and wait for completion
-        this.sleep();
-    }
+    // Go to sleep and wait for completion
+    this.sleep();
+}
 
     /**
      * Handle DISPATCH event - The Core Loop
      * This actually spins up the target agent to do the work
      */
     async onDispatch(msg) {
-        const { agentId, content, taskId } = msg;
-        console.log(`[Orchestrator] 🚀 SPINNING UP ${agentId} for task: ${taskId}`);
+    const { agentId, content, taskId } = msg;
+    console.log(`[Orchestrator] 🚀 SPINNING UP ${agentId} for task: ${taskId}`);
 
-        // Update Status
-        this.wake(`${agentId} activated`);
-        const task = this.pendingTasks.get(taskId);
-        if (task) {
-            task.status = 'in_progress';
-            task.assignedTo = agentId;
-        }
-
-        // EXECUTE AGENT ASYNC (Parallel Processing)
-        // We don't await this so the bus keeps moving
-        this.runAgentExecution(agentId, taskId, content).catch(err => {
-            console.error(`[Orchestrator] 💥 Agent ${agentId} crashed:`, err);
-            BusOps.BLOCKER(agentId, taskId, `Crashed: ${err.message}`);
-        });
+    // Update Status
+    this.wake(`${agentId} activated`);
+    const task = this.pendingTasks.get(taskId);
+    if (task) {
+        task.status = 'in_progress';
+        task.assignedTo = agentId;
     }
+
+    // EXECUTE AGENT ASYNC (Parallel Processing)
+    // We don't await this so the bus keeps moving
+    this.runAgentExecution(agentId, taskId, content).catch(err => {
+        console.error(`[Orchestrator] 💥 Agent ${agentId} crashed:`, err);
+        BusOps.BLOCKER(agentId, taskId, `Crashed: ${err.message}`);
+    });
+}
 
     /**
      * Run the Agent Logic (LLM Process)
      */
     async runAgentExecution(agentId, taskId, instructions) {
-        // 1. Get Agent Profile
-        const agent = getAgent(agentId);
-        if (!agent) {
-            throw new Error(`Agent ${agentId} not found`);
-        }
+    // 1. Get Agent Profile
+    const agent = getAgent(agentId);
+    if (!agent) {
+        throw new Error(`Agent ${agentId} not found`);
+    }
 
-        // 2. Build Context
-        const context = `
+    // 2. Build Context
+    const context = `
 You are ${agent.name}, ${agent.title}.
 TASK ID: ${taskId}
 INSTRUCTIONS: ${instructions}
@@ -339,34 +347,34 @@ If you are done, use [[COMPLETE: deliverable summary]].
 If you need more time/steps, simply describe what you are doing.
 `;
 
-        // 3. Think (LLM Call)
-        console.log(`[Orchestrator] ${agentId} is thinking...`);
-        const response = await chat(agent.prompt?.system || `You are ${agentId}. Act professionally.`, context);
+    // 3. Think (LLM Call)
+    console.log(`[Orchestrator] ${agentId} is thinking...`);
+    const response = await chat(agent.prompt?.system || `You are ${agentId}. Act professionally.`, context);
 
-        // 4. Act (Parse Response)
-        // Check for COMPLETE
-        if (response.includes('[[COMPLETE:')) {
-            const match = response.match(/\[\[COMPLETE:\s*(.+?)\]\]/is);
-            const deliverable = match ? match[1] : response;
-            await BusOps.COMPLETE(agentId, taskId, deliverable);
-        }
-        // Check for QUERY
-        else if (response.includes('[[QUERY:')) {
-            const match = response.match(/\[\[QUERY:\s*(.+?)\s*\|\s*(.+?)\]\]/is);
-            if (match) {
-                await BusOps.QUERY(agentId, taskId, match[2], [match[1]]);
-            } else {
-                // Fallback: just post message
-                await BusOps.ASSERT(agentId, taskId, response);
-            }
-        }
-        // Metadata / Status Update / Partial Work
-        else {
+    // 4. Act (Parse Response)
+    // Check for COMPLETE
+    if (response.includes('[[COMPLETE:')) {
+        const match = response.match(/\[\[COMPLETE:\s*(.+?)\]\]/is);
+        const deliverable = match ? match[1] : response;
+        await BusOps.COMPLETE(agentId, taskId, deliverable);
+    }
+    // Check for QUERY
+    else if (response.includes('[[QUERY:')) {
+        const match = response.match(/\[\[QUERY:\s*(.+?)\s*\|\s*(.+?)\]\]/is);
+        if (match) {
+            await BusOps.QUERY(agentId, taskId, match[2], [match[1]]);
+        } else {
+            // Fallback: just post message
             await BusOps.ASSERT(agentId, taskId, response);
-            // Auto-complete for now if simple response to avoid hanging tasks
-            await BusOps.COMPLETE(agentId, taskId, response);
         }
     }
+    // Metadata / Status Update / Partial Work
+    else {
+        await BusOps.ASSERT(agentId, taskId, response);
+        // Auto-complete for now if simple response to avoid hanging tasks
+        await BusOps.COMPLETE(agentId, taskId, response);
+    }
+}
 }
 
 // Singleton instance

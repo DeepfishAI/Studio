@@ -307,6 +307,34 @@ app.get('/api/events', (req, res) => {
     });
 });
 
+// Project History & Deliverables API
+// GET /api/projects
+app.get('/api/projects', async (req, res) => {
+    try {
+        // Import `bus.js` helpers dynamically or assume available if imported at top
+        const { getActiveTasks, getTaskContext } = await import('./bus.js');
+        const active = getActiveTasks();
+
+        // TODO: Also fetch 'completed' from Redis if we implement `completed_tasks` set
+        // For now, return active + simple mock history if needed
+
+        res.json({
+            success: true,
+            projects: active.map(t => ({
+                id: t.taskId,
+                status: t.status,
+                created: t.createdAt,
+                request: t.originalRequest,
+                deliverable: t.deliverable || null,
+                agent: t.assignedTo || null
+            }))
+        });
+    } catch (err) {
+        console.error('Failed to list projects:', err);
+        res.status(500).json({ error: 'Failed to fetch projects' });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`🐟 DeepFish API Server running on http://localhost:${PORT}`);

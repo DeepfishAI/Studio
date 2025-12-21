@@ -115,6 +115,7 @@ export async function updateTaskStatus(taskId, status) {
             // Manage active list
             if (status === 'completed' || status === 'failed') {
                 await redis.srem('active_tasks', taskId);
+                await redis.sadd('completed_tasks', taskId); // Track history
             }
         }
 

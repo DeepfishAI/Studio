@@ -2,11 +2,23 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
-// ... (imports)
+import LandingPage from './pages/LandingPage'
+import VerificationPage from './pages/VerificationPage'
+import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
+import ChatPage from './pages/ChatPage'
+import AgentsPage from './pages/AgentsPage'
+import AgentProfilePage from './pages/AgentProfilePage'
+import PricingPage from './pages/PricingPage'
+import BillingPage from './pages/BillingPage'
+import CheckoutSuccessPage from './pages/CheckoutSuccessPage'
+import CheckoutCanceledPage from './pages/CheckoutCanceledPage'
+import WorkspacePage from './pages/WorkspacePage'
+import TogglesPage from './pages/TogglesPage'
+import StorePage from './pages/StorePage'
+import AdminPage from './pages/AdminPage'
 
-// ...
-
-function AppRoutes() {
+function ProtectedRoute({ children }) {
     const { user, loading } = useAuth()
     const navigate = useNavigate()
 

@@ -252,7 +252,7 @@ export default function LandingPage() {
             )}
 
             <div className="footer">
-                Prices subject to change during Beta. • DeepFish AI © 2025
+                Early access onlyPrices subject to change in Beta. • DeepFish AI © 2025
             </div>
         </div>
     );

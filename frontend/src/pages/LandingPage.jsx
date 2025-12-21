@@ -137,18 +137,29 @@ export default function LandingPage() {
                     border-color: #FF3366;
                 }
                 .login-link {
-                    margin-top: 20px;
+                    margin-top: 24px;
                     color: #8b9bb4;
-                    font-size: 0.9rem;
+                    font-size: 0.95rem;
                     text-decoration: none;
-                    transition: color 0.2s;
+                    background: none;
+                    border: none;
+                    padding: 0;
+                    cursor: pointer;
+                    font-family: inherit;
+                    transition: all 0.2s;
+                    display: inline-block;
                 }
                 .login-link span {
                     color: #FF3366;
                     font-weight: 600;
+                    margin-left: 4px;
                 }
                 .login-link:hover {
                     color: white;
+                    transform: translateY(-1px);
+                }
+                .login-link:hover span {
+                    text-decoration: underline;
                 }
                 .beta-tag {
                     background: rgba(255, 51, 102, 0.1);

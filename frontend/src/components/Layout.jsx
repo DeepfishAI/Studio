@@ -1,11 +1,27 @@
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { agents } from '../data/agents'
 import '../styles/app.css'
+import { useEffect } from 'react'
 
 function Layout() {
     const { user, logout } = useAuth()
     const location = useLocation()
+    const navigate = useNavigate()
+    const isMobile = window.innerWidth <= 768
+
+    // Global Shortcut: ESC -> Workspace
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault()
+                // If we are already there, maybe go back? For now, just go to workspace.
+                navigate('/app/workspace')
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [navigate])
 
     const isActive = (path) => location.pathname === path || location.pathname === `/app${path}`
 

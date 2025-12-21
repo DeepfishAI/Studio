@@ -111,16 +111,20 @@ function DashboardPage() {
 function ProjectHistoryList() {
     const [projects, setProjects] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
+    const API_BASE = import.meta.env.VITE_API_URL || '';
 
     React.useEffect(() => {
-        fetch('/api/projects') // Assuming proxy setup or full URL needed
-            .then(res => res.json())
+        fetch(`${API_BASE}/api/projects`)
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
             .then(data => {
-                if (data.success) setProjects(data.projects);
+                if (data.success) setProjects(data.projects || []);
                 setLoading(false);
             })
             .catch(err => {
-                console.error("Failed to load history", err);
+                console.error("[ProjectHistory] Failed to load:", err);
                 setLoading(false);
             });
     }, []);

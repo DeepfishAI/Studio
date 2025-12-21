@@ -8,9 +8,21 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         // Check for existing session
-        const savedUser = localStorage.getItem('deepfish_user')
-        if (savedUser) {
-            setUser(JSON.parse(savedUser))
+        try {
+            const savedUser = localStorage.getItem('deepfish_user')
+            if (savedUser) {
+                const parsed = JSON.parse(savedUser)
+                // Validate minimum required fields
+                if (parsed && parsed.email) {
+                    setUser(parsed)
+                } else {
+                    // Invalid data, clear it
+                    localStorage.removeItem('deepfish_user')
+                }
+            }
+        } catch (err) {
+            console.warn('[Auth] Failed to restore session, clearing corrupted data:', err)
+            localStorage.removeItem('deepfish_user')
         }
         setLoading(false)
     }, [])

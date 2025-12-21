@@ -9,24 +9,39 @@ export default function LandingPage() {
     const handleJoin = async (e) => {
         e.preventDefault();
 
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            alert('Please enter a valid email address');
+            return;
+        }
+
+        const API_BASE = import.meta.env.VITE_API_URL || '';
+
         try {
-            await fetch('/api/leads', {
+            const response = await fetch(`${API_BASE}/api/leads`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
             });
 
-            console.log('Lead captured:', email);
+            const data = await response.json();
+
+            if (!response.ok) {
+                console.warn('[Landing] Join failed:', data.message || data.error);
+            }
+
+            console.log('[Landing] Lead captured:', email);
             setJoined(true);
 
-            // Redirect to Verification Page (Simulating Email Link Click)
+            // Redirect to Verification Page
             setTimeout(() => {
                 navigate(`/verify?email=${encodeURIComponent(email)}`);
             }, 2000);
 
         } catch (err) {
-            console.error('Failed to join:', err);
-            // Fallback
+            console.error('[Landing] Failed to join:', err);
+            // Fallback - still allow access
             setJoined(true);
             setTimeout(() => navigate('/app'), 2000);
         }

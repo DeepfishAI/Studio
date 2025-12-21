@@ -18,7 +18,7 @@ import * as Billing from './billing.js';
 import * as Memory from './memory.js';
 import { isLlmAvailable, getAvailableProviders } from './llm.js';
 import { getApiKey } from './config.js';
-import { isTwilioEnabled, isElevenLabsEnabled, handleIncomingCall, handleRouteCall, handleAgentConversation, serveAudio, sendSms, generateElevenLabsAudio } from './twilio.js';
+import { isTwilioEnabled, isElevenLabsEnabled, handleIncomingCall, handleRouteCall, handleAgentConversation, serveAudio, sendSms, generateElevenLabsAudio, handleConference } from './twilio.js';
 import Redis from 'ioredis';
 
 // Redis Client (Automatic Recovery System)
@@ -187,9 +187,16 @@ app.get('/health', (req, res) => {
 // MOUNT ROUTERS
 // ============================================
 
+// Core Feature Routes
+app.use('/api/chat', chatRoutes);
+app.use('/api/billing', billingRoutes);
+app.use('/api/voice', voiceRoutes); // includes /incoming, /route, /agent/:id, /audio/:id, /tts
+
+// Explicit POST routes for Twilio (also needed here for direct hooks)
 app.post('/api/voice/incoming', handleIncomingCall);
 app.post('/api/voice/route', handleRouteCall);
 app.post('/api/voice/conference', handleConference); // The Meeting Room
+
 app.use('/api/training', trainingRoutes);
 
 // TERMINAL ALIASES (For legacy Twilio Configuration)
@@ -220,21 +227,7 @@ app.get('/api/agents', (req, res) => {
     res.redirect('/api/chat/agents');
 });
 
-// ... (Beta Leads Routes - retain in server.js for now or move to 'admin')
-/**
- * Beta Lead Capture
- * POST /api/leads
- */
-app.post('/api/leads', (req, res) => {
-    // ... (logic from before)
-    // To save space, assuming I can keep this block or move it.
-    // I will keep it here as it's small.
-    // (Wait, I need to preserve the logic if I replace the whole file? 
-    // The instruction says "Rewrite server.js... Remove old route handlers".
-    // I will try to preserve the Beta Leads logic but I need to read it again to be safe.
-    // Actually, I should use `replace_file_content` targeting the specific blocks to remove.)
-});
-// ...
+// ... (Beta Leads Routes defined above)
 
 // ... (Stream logic)
 // ...

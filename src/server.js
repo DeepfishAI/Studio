@@ -155,6 +155,15 @@ const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
 if (fs.existsSync(frontendDistPath)) {
     console.log(`[System] 🌐 Serving frontend from: ${frontendDistPath}`);
     app.use(express.static(frontendDistPath));
+
+    // Serve index.html for all other routes (SPA support)
+    // This MUST come AFTER api routes and express.static
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+            return next();
+        }
+        res.sendFile(path.join(frontendDistPath, 'index.html'));
+    });
 } else {
     console.warn(`[System] ⚠️ Frontend dist not found at: ${frontendDistPath}. Run 'npm run build' first.`);
 }

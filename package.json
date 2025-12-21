@@ -7,7 +7,7 @@
         "deepfish": "./src/cli.js"
     },
     "scripts": {
-        "start": "concurrently \"node src/server.js\" \"node src/launch_bridge.js\"",
+        "start": "node src/server.js",
         "cli": "node src/cli.js",
         "server": "node src/server.js",
         "dev": "node src/cli.js --dev",

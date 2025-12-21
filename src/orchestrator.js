@@ -10,6 +10,7 @@ import { spawnIntern, spawnInternTeam, getActiveInterns } from './interns.js';
 import { sendSms, makeCall } from './twilio.js';
 import { chat } from './llm.js';
 import { getAgent } from './agent.js';
+import { queryKnowledge as nvidiaQueryKnowledge, checkSafety as nvidiaCheckSafety } from './nvidia-cortex.js';
 
 const ADMIN_PHONE = '4059051338';
 
@@ -410,44 +411,27 @@ If you need more time/steps, simply describe what you are doing.
     }
 
     /**
-     * Call Python Bridge for Knowledge
+     * Fetch Knowledge via NVIDIA RAG
      */
     async fetchKnowledge(query, collection) {
         try {
-            const res = await fetch('http://localhost:8000/rag/query', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query, collection })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                return data.chunk || "";
-            }
+            return await nvidiaQueryKnowledge(query, collection);
         } catch (err) {
-            console.warn(`[Orchestrator] RAG Bridge unavailable: ${err.message}`);
+            console.warn(`[Orchestrator] RAG unavailable: ${err.message}`);
+            return "";
         }
-        return "";
     }
 
     /**
-     * Call Python Bridge for Safety
+     * Check Safety via NVIDIA
      */
     async checkSafety(text, mode) {
         try {
-            const res = await fetch('http://localhost:8000/safety/check', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text, mode })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                return data.safe !== false; // Default to safe if undefined
-            }
+            return await nvidiaCheckSafety(text, mode);
         } catch (err) {
-            // console.warn(`[Orchestrator] Safety Bridge unavailable: ${err.message}`);
-            return true; // Fail open if bridge is down (development mode)
+            console.warn(`[Orchestrator] Safety check failed: ${err.message}`);
+            return true; // Fail open
         }
-        return true;
     }
 }
 

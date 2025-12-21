@@ -109,7 +109,14 @@ setInterval(cleanupPendingAudio, 60000);
 export async function generateElevenLabsAudio(text, agentId) {
     // Load agent to get their voice ID
     const agent = getAgent(agentId);
-    let voiceId = agent?.profile?.agent?.tools?.voiceSynthesis?.voiceId;
+
+    // 1. Check User Overlay (Priority)
+    let voiceId = agent?.profile?.user?.preferences?.voice?.voiceId;
+
+    // 2. Check Agent Default
+    if (!voiceId) {
+        voiceId = agent?.profile?.agent?.tools?.voiceSynthesis?.voiceId;
+    }
 
     // Legacy fallback
     if (!voiceId) {

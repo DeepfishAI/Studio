@@ -398,22 +398,25 @@ app.get('/api/events', (req, res) => {
 });
 
 /**
- * Bridge Status Proxy
- * Allows frontend to check Python sidecar status via Node.js
+ * CORTEX Status (NVIDIA Direct API)
+ * Reports availability of NVIDIA RAG/Safety features
  * GET /api/bridge/status
  */
 app.get('/api/bridge/status', async (req, res) => {
-    try {
-        const response = await fetch('http://localhost:8000/status');
-        if (response.ok) {
-            const data = await response.json();
-            res.json(data);
-        } else {
-            res.status(502).json({ status: 'offline', error: 'Bridge returned error' });
-        }
-    } catch (e) {
-        // console.error('[Proxy] Bridge check failed:', e.message);
-        res.status(502).json({ status: 'offline', error: 'Bridge unreachable' });
+    const hasNvidia = !!process.env.NVIDIA_API_KEY;
+
+    if (hasNvidia) {
+        res.json({
+            status: 'online',
+            provider: 'nvidia',
+            features: ['embeddings', 'reranking', 'safety']
+        });
+    } else {
+        res.json({
+            status: 'offline',
+            provider: 'nvidia',
+            error: 'NVIDIA_API_KEY not configured'
+        });
     }
 });
 

@@ -22,29 +22,44 @@ export default function BusFeed() {
         eventSource.onmessage = (event) => {
             if (event.data === ': heartbeat') return;
 
-            try {
-                const message = JSON.parse(event.data);
+            eventSource.onmessage = (event) => {
+                if (event.data === ': heartbeat') return;
 
-                // Add to list (keep last 50)
-                setMessages(prev => {
-                    const next = [...prev, message];
-                    if (next.length > 50) return next.slice(next.length - 50);
-                    return next;
-                });
-            } catch (err) {
-                console.warn('[BusFeed] Parse error:', err);
-            }
-        };
+                try {
+                    const message = JSON.parse(event.data);
 
-        eventSource.onerror = (err) => {
-            console.error('[BusFeed] Stream error:', err);
-            eventSource.close();
-        };
+                    // Auto-Jump / Alert on Urgent Needs
+                    if (message.type === 'BLOCKER' || message.type === 'QUERY') {
+                        // Play notification sound
+                        const audio = new Audio('/assets/alert.mp3'); // Assuming asset exists or fails silently
+                        audio.play().catch(() => { });
 
-        return () => {
-            eventSource.close();
-        };
-    }, []);
+                        // If we are not visible, we could flash title or show notification
+                        if (document.hidden) {
+                            new Notification("DeepFish Alert", { body: `${message.agentId} needs you!` });
+                        }
+                    }
+
+                    // Add to list (keep last 50)
+                    setMessages(prev => {
+                        const next = [...prev, message];
+                        if (next.length > 50) return next.slice(next.length - 50);
+                        return next;
+                    });
+                } catch (err) {
+                    console.warn('[BusFeed] Parse error:', err);
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                console.error('[BusFeed] Stream error:', err);
+                eventSource.close();
+            };
+
+            return () => {
+                eventSource.close();
+            };
+        }, []);
 
     // Auto-scroll
     useEffect(() => {

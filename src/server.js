@@ -187,9 +187,9 @@ app.get('/health', (req, res) => {
 // MOUNT ROUTERS
 // ============================================
 
-app.use('/api/chat', chatRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/voice', voiceRoutes); // includes /incoming, /route, /agent/:id, /audio/:id, /tts
+app.post('/api/voice/incoming', handleIncomingCall);
+app.post('/api/voice/route', handleRouteCall);
+app.post('/api/voice/conference', handleConference); // The Meeting Room
 app.use('/api/training', trainingRoutes);
 
 // TERMINAL ALIASES (For legacy Twilio Configuration)

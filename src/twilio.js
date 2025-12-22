@@ -328,7 +328,8 @@ export async function handleIncomingCall(req, res) {
     const response = new VoiceResponse();
 
     // Check if WebSocket mode is enabled (set USE_WEBSOCKET_VOICE=true)
-    const useWebSocket = process.env.USE_WEBSOCKET_VOICE === 'true';
+    // FORCE OFF - Railway env var may still be set incorrectly
+    const useWebSocket = false;
 
     if (useWebSocket) {
         // WebSocket Mode: Connect to Media Stream for real-time audio

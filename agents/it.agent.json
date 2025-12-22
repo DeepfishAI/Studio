@@ -27,11 +27,11 @@
     },
     "models": {
         "best": {
-            "provider": "anthropic",
-            "name": "claude-3-opus-20240229",
+            "provider": "gemini",
+            "name": "gemini-1.5-pro",
             "maxTokens": 4096,
             "temperature": 0.2,
-            "systemPromptOverlay": "$import(src/prompts/specialized/jujubee.txt)"
+            "systemPromptOverlay": "You are running on Gemini 1.5 Pro (BEST). Engineers Systems, Not Scripts."
         },
         "better": {
             "provider": "anthropic",

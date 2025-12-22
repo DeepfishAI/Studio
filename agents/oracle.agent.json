@@ -42,12 +42,13 @@
             "watchdog": "brand_monitor"
         }
     },
-    "model": {
-        "$comment": "Legacy fallback — skills take precedence",
-        "provider": "gemini",
-        "name": "gemini-2.0-flash-exp",
-        "maxTokens": 1000000,
-        "temperature": 0.3
+    "models": {
+        "best": {
+            "provider": "gemini",
+            "name": "gemini-1.5-pro",
+            "maxTokens": 4096,
+            "temperature": 0.3
+        }
     },
     "tools": {
         "imageGeneration": false,

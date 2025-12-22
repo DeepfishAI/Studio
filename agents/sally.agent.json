@@ -24,12 +24,19 @@
             "quick_posts": "efficient_thinker"
         }
     },
-    "model": {
-        "$comment": "Legacy fallback — skills take precedence",
-        "provider": "gemini",
-        "name": "gemini-2.0-flash-exp",
-        "maxTokens": 1000000,
-        "temperature": 0.7
+    "models": {
+        "best": {
+            "provider": "gemini",
+            "name": "gemini-1.5-pro",
+            "maxTokens": 4096,
+            "temperature": 0.7
+        },
+        "better": {
+            "provider": "gemini",
+            "name": "gemini-1.5-flash",
+            "maxTokens": 2048,
+            "temperature": 0.7
+        }
     },
     "tools": {
         "imageGeneration": false,

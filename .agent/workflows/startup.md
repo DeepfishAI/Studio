@@ -9,22 +9,7 @@ description: Boot script for Railway sync and initialization
 railway.cmd login
 ```
 
-2. Sync Railway API keys to local configuration
+2. Sync Railway API keys to local configuration (Primary Data Source)
 ```powershell
 npm run secrets:sync
-```
-
-3. Login to GitHub
-```powershell
-gh auth login
-```
-
-4. Login to ElevenLabs
-```powershell
-elevenlabs auth login
-```
-
-5. Login to Dashlane
-```powershell
-dashlane login
 ```

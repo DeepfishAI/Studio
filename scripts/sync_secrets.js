@@ -15,7 +15,11 @@ const mapping = {
     'STRIPE_PUBLISHABLE_KEY': 'stripe.publishable_key',
     'STRIPE_WEBHOOK_SECRET': 'stripe.webhook_secret',
     'FRONTEND_URL': 'environment.frontend_url',
-    'NODE_ENV': 'environment.node_env'
+    'NODE_ENV': 'environment.node_env',
+    'GH_TOKEN': 'auth.github_token',
+    'GITHUB_TOKEN': 'auth.github_token',
+    'DASHLANE_MASTER_PASSWORD': 'auth.dashlane_password',
+    'DASHLANE_EMAIL': 'auth.dashlane_email'
 };
 
 function setDeepValue(obj, path, value) {

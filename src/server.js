@@ -478,8 +478,6 @@ app.post('/api/workspace/file', async (req, res) => {
 });
 
 // Start server
-
-// Start server
 app.listen(PORT, () => {
     console.log(`🐟 DeepFish API Server running on http://localhost:${PORT}`);
     console.log(`📞 Vesper is ready to take calls`);

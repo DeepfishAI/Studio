@@ -112,7 +112,7 @@ async function chatGemini(systemPrompt, userMessage, options) {
     const apiKey = getApiKey('gemini');
     if (!apiKey) throw new Error('Gemini API key not configured');
 
-    const model = options.model || 'gemini-1.5-flash';
+    const model = options.model || 'gemini-2.0-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     try {
@@ -149,7 +149,7 @@ async function chatNvidia(systemPrompt, userMessage, options) {
     if (!apiKey) throw new Error('NVIDIA API key not configured');
 
     // Default to Llama 70B
-    const model = options.model || 'meta/llama-3.1-70b-instruct';
+    const model = options.model || 'meta/llama-3.1-405b-instruct';
     const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
 
     try {

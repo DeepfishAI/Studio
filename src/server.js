@@ -9,6 +9,8 @@ import { Vesper } from './vesper.js';
 import { Mei } from './mei.js';
 import { createTaskContext, BusOps, getTaskTranscript } from './bus.js';
 import * as Billing from './billing.js';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -406,6 +408,76 @@ app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), asyn
         res.status(400).json({ error: 'Webhook error', details: error.message });
     }
 });
+
+// Workspace file API routes
+// Helper to ensure a requested path stays within the repository root
+const REPO_ROOT = process.cwd();
+function resolveSafePath(requestedPath) {
+    const resolved = path.resolve(REPO_ROOT, requestedPath);
+    if (!resolved.startsWith(REPO_ROOT)) {
+        throw new Error('Invalid file path');
+    }
+    return resolved;
+}
+
+// List files in the repository (excluding node_modules, .git, and build artifacts)
+app.get('/api/workspace/files', async (req, res) => {
+    try {
+        const walk = (dir) => {
+            let results = [];
+            const list = fs.readdirSync(dir);
+            list.forEach((file) => {
+                const filePath = path.join(dir, file);
+                const stat = fs.statSync(filePath);
+                const rel = path.relative(REPO_ROOT, filePath);
+                if (stat && stat.isDirectory()) {
+                    if (['node_modules', '.git', 'output', 'frontend/build'].includes(rel)) return;
+                    results = results.concat(walk(filePath));
+                } else {
+                    results.push(rel.replace(/\\\\/g, '/'));
+                }
+            });
+            return results;
+        };
+        const files = walk(REPO_ROOT);
+        res.json({ files });
+    } catch (err) {
+        console.error('[API /workspace/files] error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get file content
+app.get('/api/workspace/file', async (req, res) => {
+    try {
+        const { path: filePath } = req.query;
+        if (!filePath) return res.status(400).json({ error: 'Missing path query param' });
+        const safePath = resolveSafePath(filePath);
+        const content = fs.readFileSync(safePath, 'utf8');
+        res.json({ content });
+    } catch (err) {
+        console.error('[API /workspace/file] error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Save file content
+app.post('/api/workspace/file', async (req, res) => {
+    try {
+        const { path: filePath, content } = req.body;
+        if (!filePath || typeof content !== 'string') {
+            return res.status(400).json({ error: 'Missing path or content' });
+        }
+        const safePath = resolveSafePath(filePath);
+        fs.writeFileSync(safePath, content, 'utf8');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[API /workspace/file] write error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Start server
 
 // Start server
 app.listen(PORT, () => {

@@ -38,3 +38,6 @@ secrets/
 *.key
 *.pem
 # config.secrets.json  # DISABLED DURING DEVELOPMENT
+
+# Output
+output/

@@ -160,4 +160,42 @@ export const api = {
     },
 }
 
+// Workspace API
+export const getWorkspaceFiles = async () => {
+    try {
+        const response = await fetch(`${API_BASE}/api/workspace/files`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    } catch (error) {
+        console.error('[API] getWorkspaceFiles error:', error);
+        throw error;
+    }
+};
+
+export const getFileContent = async (filePath) => {
+    try {
+        const response = await fetch(`${API_BASE}/api/workspace/file?path=${encodeURIComponent(filePath)}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    } catch (error) {
+        console.error('[API] getFileContent error:', error);
+        throw error;
+    }
+};
+
+export const saveFileContent = async (filePath, content) => {
+    try {
+        const response = await fetch(`${API_BASE}/api/workspace/file`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, content }),
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+    } catch (error) {
+        console.error('[API] saveFileContent error:', error);
+        throw error;
+    }
+};
+
 export default api

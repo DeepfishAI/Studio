@@ -1,72 +1,69 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import MonacoEditorPanel from '../components/MonacoEditorPanel'
 import CodePreview from '../components/CodePreview'
 import FileTree from '../components/FileTree'
 import AssetUploader from '../components/AssetUploader'
 import WorkspaceChat from '../components/WorkspaceChat'
+import { getWorkspaceFiles, getFileContent, saveFileContent } from '../services/api'
 
-// Default project structure
+// Initial empty project structure
 const defaultProject = {
-    files: {
-        'index.html': `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Project</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <h1>Hello DeepFish! 🐟</h1>
-    <p>Start coding with your AI team.</p>
-    <script src="app.js"></script>
-</body>
-</html>`,
-        'styles.css': `/* My Styles */
-body {
-    font-family: 'Segoe UI', sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    color: #ffffff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    margin: 0;
-}
-
-h1 {
-    color: #1e90ff;
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-}
-
-p {
-    color: #a0a0a0;
-}`,
-        'app.js': `// My JavaScript
-console.log('Hello from DeepFish! 🐟');
-
-// Your code here...
-function greet(name) {
-    return \`Welcome, \${name}!\`;
-}
-
-console.log(greet('Developer'));`
-    },
+    files: {},
     assets: {}
 }
 
 function WorkspacePage() {
     const [project, setProject] = useState(defaultProject)
-    const [activeFile, setActiveFile] = useState('index.html')
-    const [openTabs, setOpenTabs] = useState(['index.html', 'styles.css', 'app.js'])
+    const [fileList, setFileList] = useState([])
+    const [activeFile, setActiveFile] = useState(null)
+    const [openTabs, setOpenTabs] = useState([])
     const [viewMode, setViewMode] = useState('code') // 'code' or 'preview'
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState(null)
+    const [saving, setSaving] = useState(false)
+
+    // Load file list from backend on mount
+    useEffect(() => {
+        async function loadFiles() {
+            try {
+                setLoading(true)
+                const response = await getWorkspaceFiles()
+                setFileList(response.files || [])
+                setError(null)
+            } catch (err) {
+                console.error('Failed to load workspace files:', err)
+                setError('Failed to load workspace files')
+            } finally {
+                setLoading(false)
+            }
+        }
+        loadFiles()
+    }, [])
 
     // Get current file content
     const currentContent = project.files[activeFile] || ''
 
-    // Update file content
+    // Load file content when a file is selected
+    const loadFileContent = useCallback(async (filename) => {
+        if (project.files[filename] !== undefined) {
+            // Already loaded
+            return
+        }
+        try {
+            const response = await getFileContent(filename)
+            setProject(prev => ({
+                ...prev,
+                files: {
+                    ...prev.files,
+                    [filename]: response.content || ''
+                }
+            }))
+        } catch (err) {
+            console.error(`Failed to load file ${filename}:`, err)
+        }
+    }, [project.files])
+
+    // Update file content (local state)
     const handleFileChange = (content) => {
         setProject(prev => ({
             ...prev,
@@ -77,12 +74,26 @@ function WorkspacePage() {
         }))
     }
 
+    // Save file to backend
+    const handleSaveFile = async () => {
+        if (!activeFile) return
+        try {
+            setSaving(true)
+            await saveFileContent(activeFile, currentContent)
+        } catch (err) {
+            console.error('Failed to save file:', err)
+        } finally {
+            setSaving(false)
+        }
+    }
+
     // Open a file
-    const handleOpenFile = (filename) => {
+    const handleOpenFile = async (filename) => {
         setActiveFile(filename)
         if (!openTabs.includes(filename)) {
             setOpenTabs([...openTabs, filename])
         }
+        await loadFileContent(filename)
     }
 
     // Close a tab
@@ -91,10 +102,12 @@ function WorkspacePage() {
         setOpenTabs(newTabs)
         if (activeFile === filename && newTabs.length > 0) {
             setActiveFile(newTabs[0])
+        } else if (newTabs.length === 0) {
+            setActiveFile(null)
         }
     }
 
-    // Create new file
+    // Create new file (local only for now)
     const handleCreateFile = (filename) => {
         if (!project.files[filename]) {
             setProject(prev => ({
@@ -104,11 +117,12 @@ function WorkspacePage() {
                     [filename]: ''
                 }
             }))
+            setFileList(prev => [...prev, filename])
             handleOpenFile(filename)
         }
     }
 
-    // Delete file
+    // Delete file (local only for now)
     const handleDeleteFile = (filename) => {
         const newFiles = { ...project.files }
         delete newFiles[filename]
@@ -116,6 +130,7 @@ function WorkspacePage() {
             ...prev,
             files: newFiles
         }))
+        setFileList(prev => prev.filter(f => f !== filename))
         handleCloseTab(filename)
     }
 
@@ -139,9 +154,33 @@ function WorkspacePage() {
                 [filename]: content
             }
         }))
+        if (!fileList.includes(filename)) {
+            setFileList(prev => [...prev, filename])
+        }
         handleOpenFile(filename)
-        // Switch to code view to show the applied code
         setViewMode('code')
+    }
+
+    if (loading) {
+        return (
+            <div className="workspace-page workspace-page--loading">
+                <div className="workspace-loading">
+                    <span className="workspace-loading__icon">🐟</span>
+                    <p>Loading workspace...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="workspace-page workspace-page--error">
+                <div className="workspace-error">
+                    <span className="workspace-error__icon">⚠️</span>
+                    <p>{error}</p>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -174,6 +213,15 @@ function WorkspacePage() {
                     >
                         ▶️ Preview
                     </button>
+                    {activeFile && (
+                        <button
+                            className="workspace-view-toggle__btn workspace-view-toggle__btn--save"
+                            onClick={handleSaveFile}
+                            disabled={saving}
+                        >
+                            {saving ? '💾 Saving...' : '💾 Save'}
+                        </button>
+                    )}
                 </div>
 
                 {viewMode === 'code' ? (
@@ -198,11 +246,17 @@ function WorkspacePage() {
                                 </div>
                             ))}
                         </div>
-                        <MonacoEditorPanel
-                            filename={activeFile}
-                            content={currentContent}
-                            onChange={handleFileChange}
-                        />
+                        {activeFile ? (
+                            <MonacoEditorPanel
+                                filename={activeFile}
+                                content={currentContent}
+                                onChange={handleFileChange}
+                            />
+                        ) : (
+                            <div className="workspace-empty">
+                                <p>Select a file to edit</p>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <CodePreview
@@ -215,10 +269,10 @@ function WorkspacePage() {
             {/* Right: Files & Assets */}
             <div className="workspace-panel workspace-panel--files">
                 <div className="workspace-panel__header">
-                    <h3>📁 Files</h3>
+                    <h3>📁 Files ({fileList.length})</h3>
                 </div>
                 <FileTree
-                    files={Object.keys(project.files)}
+                    files={fileList}
                     activeFile={activeFile}
                     onSelectFile={handleOpenFile}
                     onCreateFile={handleCreateFile}

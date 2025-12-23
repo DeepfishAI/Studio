@@ -151,7 +151,8 @@ async function shellExecutor(type, params) {
  */
 export function parseCodeFromResponse(response) {
     const codeBlocks = [];
-    const regex = /```(\w+)?\n([\s\S]*?)```/g;
+    // More robust regex: allows optional whitespace and ensures we capture content after the opening backticks
+    const regex = /```(\w+)?\s*\n?([\s\S]*?)```/g;
     let match;
 
     while ((match = regex.exec(response)) !== null) {

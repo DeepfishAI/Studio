@@ -10,7 +10,8 @@
         "start": "node src/cli.js",
         "server": "node src/server.js",
         "dev": "node src/cli.js --dev",
-        "build": "cd frontend && npm install && npm run build"
+        "build": "cd frontend && npm install && npm run build",
+        "secrets:sync": "node scripts/sync_secrets.js"
     },
     "type": "module",
     "keywords": [

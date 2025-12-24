@@ -752,3 +752,161 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ========================================
+   TERMINAL / EXPRESS CODE SERVER PAGE
+   ======================================== */
+.terminal-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--space-2xl) * 2);
+    animation: fadeIn 0.4s ease-out;
+}
+
+.terminal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-xl);
+    margin-bottom: var(--space-lg);
+}
+
+.terminal-header__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.terminal-header__title h1 {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    margin: 0;
+}
+
+.terminal-header__icon {
+    font-size: 28px;
+}
+
+.terminal-header__status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-dot--connected {
+    background: var(--color-success);
+    box-shadow: 0 0 8px var(--color-success);
+}
+
+.status-dot--disconnected {
+    background: var(--color-text-muted);
+}
+
+.terminal-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #0d1117;
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--color-bg-tertiary);
+    overflow: hidden;
+}
+
+.terminal-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-lg);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.terminal-line {
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 1.6em;
+}
+
+.terminal-line--input {
+    color: #ffd93d;
+}
+
+.terminal-line--response {
+    color: #40e0d0;
+}
+
+.terminal-line--error {
+    color: #ff6b6b;
+}
+
+.terminal-line--accent {
+    color: #00ced1;
+    font-weight: 600;
+}
+
+.terminal-line--info {
+    color: #87ceeb;
+}
+
+.terminal-line--dim {
+    color: #6a737d;
+}
+
+.terminal-input-form {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: #161b22;
+    border-top: 1px solid var(--color-bg-tertiary);
+}
+
+.terminal-prompt {
+    color: #1e90ff;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+}
+
+.terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #e6edf3;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 14px;
+    outline: none;
+}
+
+.terminal-input::placeholder {
+    color: #484f58;
+}
+
+.terminal-footer {
+    padding: var(--space-lg);
+    text-align: center;
+}
+
+.terminal-footer p {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    margin: 0;
+}
+
+.terminal-footer code {
+    background: var(--color-bg-tertiary);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: var(--font-size-sm);
+    color: var(--color-accent-cyan);
+}

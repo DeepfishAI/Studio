@@ -58,6 +58,13 @@ function Layout() {
                             <span>🛠️</span>
                             <span>Workspace</span>
                         </Link>
+                        <Link
+                            to="/app/terminal"
+                            className={`sidebar__nav-item ${isActive('/app/terminal') ? 'sidebar__nav-item--active' : ''}`}
+                        >
+                            <span>⚡</span>
+                            <span>Express Code Server</span>
+                        </Link>
                     </nav>
                 </div>
 

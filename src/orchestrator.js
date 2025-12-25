@@ -71,10 +71,11 @@ class Orchestrator {
     /**
      * Wake Mei up to handle an event
      */
-    wake(reason) {
+    wake(reason, data = {}) {
         if (this.sleeping) {
             this.sleeping = false;
             console.log(`[Orchestrator] Mei woke up! Reason: ${reason}`);
+            eventBus.emit('mei_wake', { reason, ...data });
         }
     }
 
@@ -96,7 +97,7 @@ class Orchestrator {
      * Called when a task is completed
      */
     onTaskComplete({ taskId, agentId, deliverable }) {
-        this.wake(`Task ${taskId} completed by ${agentId}`);
+        this.wake(`Task ${taskId} completed by ${agentId}`, { taskId, agentId, deliverable, type: 'complete' });
 
         const task = this.pendingTasks.get(taskId);
         if (task) {
@@ -155,7 +156,7 @@ class Orchestrator {
      * Called when an agent is blocked
      */
     onBlocker({ agentId, taskId, content }) {
-        this.wake(`Agent ${agentId} is blocked`);
+        this.wake(`Agent ${agentId} is blocked`, { taskId, agentId, content, type: 'blocker' });
         console.log(`[Orchestrator] BLOCKER from ${agentId}: ${content}`);
 
         // Mark task as blocked

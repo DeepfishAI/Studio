@@ -11,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { chat, isLlmAvailable } from './llm.js';
 import { getOrchestrator } from './orchestrator.js';
-import { createTaskContext, getTaskContext, BusOps } from './bus.js';
+import { eventBus, createTaskContext, getTaskContext, BusOps } from './bus.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -117,6 +117,29 @@ export class Mei {
         this.agents = this.config._config?.agents || [];
         this.routing = this.config._config?.routing?.rules || [];
         this.llmAvailable = isLlmAvailable();
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        eventBus.on('mei_wake', async (data) => {
+            await this.handleWake(data);
+        });
+    }
+
+    async handleWake(data) {
+        const { taskId, agentId, type, deliverable, content } = data;
+        const context = getTaskContext(taskId);
+        if (!context) return;
+
+        if (type === 'complete') {
+            console.log(`[Mei] Waking up to handle completion of ${taskId}`);
+            const message = `Task completed by **${agentId}**. Results are ready!`;
+            BusOps.ASSERT('mei', taskId, message);
+        } else if (type === 'blocker') {
+            console.log(`[Mei] Waking up to handle blocker on ${taskId}`);
+            const message = `Attention: **${agentId}** is blocked: ${content}`;
+            BusOps.ASSERT('mei', taskId, message);
+        }
     }
 
     loadConfig() {

@@ -1,5 +1,5 @@
-import { getGlobalCapacity, loadUserData, saveUserData } from './src/user.js';
-import { getProducts, getProductById } from './src/products.js';
+import { getGlobalCapacity, loadUserData, saveUserData } from './user.js';
+import { getProducts, getProductById } from './products.js';
 
 console.log('🧪 Testing Purchase -> Capacity Integration');
 

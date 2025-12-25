@@ -1,0 +1,12 @@
+{
+  "email": "user@deepfish.ai",
+  "tier": "starter",
+  "purchases": [],
+  "capacities": {
+    "any": 5,
+    "hanna": 1,
+    "it": 1,
+    "oracle": 1,
+    "sally": 1
+  }
+}

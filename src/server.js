@@ -12,7 +12,7 @@ import * as Billing from './billing.js';
 import { getProducts, getProductById } from './products.js';
 import fs from 'fs';
 import path from 'path';
-import { loadUserData, saveUserData } from './user.js';
+import { loadUserData, saveUserDataAsync } from './user.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,7 +29,40 @@ app.use(express.json());
 let userData = loadUserData();
 
 // Active chats (in-memory for now)
+// Active chats (in-memory for now)
 const activeChats = new Map();
+
+// Chat cleanup logic
+const MAX_CHAT_AGE = 24 * 60 * 60 * 1000; // 24 hours
+const CLEANUP_INTERVAL = 60 * 60 * 1000;  // 1 hour
+
+function cleanupChats() {
+    const now = Date.now();
+    let removedCount = 0;
+
+    for (const [chatId, chat] of activeChats.entries()) {
+        // Find last activity timestamp
+        let lastActivity = 0;
+        if (chat.history.length > 0) {
+            lastActivity = new Date(chat.history[chat.history.length - 1].timestamp).getTime();
+        } else {
+            // New partial chat (approximate creation time based on ID if timestamp not stored)
+            lastActivity = now;
+        }
+
+        if (now - lastActivity > MAX_CHAT_AGE) {
+            activeChats.delete(chatId);
+            removedCount++;
+        }
+    }
+
+    if (removedCount > 0) {
+        console.log(`[Server] Cleaned up ${removedCount} inactive chats.`);
+    }
+}
+
+// Start cleanup interval
+setInterval(cleanupChats, CLEANUP_INTERVAL);
 
 /**
  * Health check
@@ -92,7 +125,7 @@ app.post('/api/purchase', (req, res) => {
         userData.capacities[agent] = (userData.capacities[agent] || 0) + (product.effect_value || 1);
     }
 
-    saveUserData(userData);
+    await saveUserDataAsync(userData);
 
     res.json({
         success: true,

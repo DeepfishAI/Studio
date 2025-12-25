@@ -12,10 +12,23 @@ import { EventEmitter } from 'events';
 export const eventBus = new EventEmitter();
 
 // In-memory bus state (would be Redis/DB in production)
+// In-memory bus state with memory cap
+const MAX_BUS_MESSAGES = 2000;
 const busState = {
     messages: [],
     taskContexts: new Map()
 };
+
+/**
+ * Prune old messages to prevent memory leaks
+ */
+function pruneMessages() {
+    if (busState.messages.length > MAX_BUS_MESSAGES) {
+        // Keep last 80% to avoid thrashing
+        const keepCount = Math.floor(MAX_BUS_MESSAGES * 0.8);
+        busState.messages = busState.messages.slice(-keepCount);
+    }
+}
 
 /**
  * Generate a context hash for drift detection
@@ -89,6 +102,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -118,6 +132,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -145,6 +160,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -174,6 +190,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -207,6 +224,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
 
         // Emit event
         eventBus.emit('bus_message', message);
@@ -234,6 +252,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
 
         // Emit event - this is important for orchestration
         eventBus.emit('bus_message', message);
@@ -260,6 +279,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
         context.status = 'completed';
 
         // Emit event - wakes Mei
@@ -288,6 +308,7 @@ export const BusOps = {
 
         context.messages.push(message);
         busState.messages.push(message);
+        pruneMessages();
 
         // Emit event - wakes Mei
         eventBus.emit('bus_message', message);

@@ -26,6 +26,28 @@ export const api = {
     },
 
     /**
+     * Send command to CLI endpoint
+     */
+    async cliCommand(command) {
+        try {
+            const response = await fetch(`${API_BASE}/api/cli`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command }),
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            return response.json()
+        } catch (error) {
+            console.error('[API] cliCommand error:', error)
+            throw error
+        }
+    },
+
+    /**
      * Get chat history for a specific chat
      */
     async getChatHistory(chatId) {

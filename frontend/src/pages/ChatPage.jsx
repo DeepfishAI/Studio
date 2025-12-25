@@ -38,6 +38,61 @@ function ChatPage() {
         setChatId(null)
     }, [agentId])
 
+    // Polling for bus events
+    useEffect(() => {
+        let interval;
+        if (chatId && useRealApi) {
+            console.log(`[Chat] Starting polling for chatId: ${chatId}`);
+            interval = setInterval(async () => {
+                try {
+                    const { transcript } = await api.getTranscript(chatId);
+                    if (transcript && transcript.length > 0) {
+                        setMessages(prev => {
+                            const newMessages = [...prev];
+                            let updated = false;
+
+                            transcript.forEach(busMsg => {
+                                // Only show certain types of bus messages in the chat
+                                // or update existing messages based on contextHash if needed
+                                const msgId = `bus_${busMsg.timestamp}`;
+                                if (!newMessages.find(m => m.id === msgId)) {
+                                    const respondingAgent = getAgent(busMsg.agentId) || getAgent(busMsg.toAgentId) || currentAgent;
+
+                                    let text = busMsg.content;
+                                    if (busMsg.type === 'HANDOFF') {
+                                        text = `🔄 *Mei handed off task to ${getAgent(busMsg.toAgentId)?.name || busMsg.toAgentId}*`;
+                                    } else if (busMsg.type === 'COMPLETE') {
+                                        text = `✅ **Task Complete:** ${typeof busMsg.content === 'object' ? JSON.stringify(busMsg.content) : busMsg.content}`;
+                                    } else if (busMsg.type === 'BLOCKER') {
+                                        text = `⚠️ **Blocked:** ${busMsg.content}`;
+                                    } else if (busMsg.type === 'ASSERT') {
+                                        // Skip internal assertions unless they are important
+                                        return;
+                                    }
+
+                                    newMessages.push({
+                                        id: msgId,
+                                        type: 'agent',
+                                        agent: respondingAgent,
+                                        text: text,
+                                        isBusEvent: true,
+                                        time: new Date(busMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                    });
+                                    updated = true;
+                                }
+                            });
+
+                            return updated ? newMessages : prev;
+                        });
+                    }
+                } catch (err) {
+                    console.error('[Chat] Polling error:', err);
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+        return () => clearInterval(interval);
+    }, [chatId, useRealApi, currentAgent]);
+
     // Welcome message on mount
     useEffect(() => {
         if (messages.length === 0 && currentAgent) {
@@ -156,7 +211,9 @@ function ChatPage() {
                             />
                         )}
                         <div>
-                            <div className="message__content">{message.text}</div>
+                            <div className={`message__content ${message.isBusEvent ? 'message__content--event' : ''}`}>
+                                {message.text}
+                            </div>
                             <div className="message__time">{message.time}</div>
                         </div>
                     </div>

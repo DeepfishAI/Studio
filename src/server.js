@@ -148,6 +148,35 @@ app.post('/api/chat', async (req, res) => {
 });
 
 /**
+ * CLI Endpoint for Terminal Page
+ * Body: { command }
+ */
+app.post('/api/cli', async (req, res) => {
+    try {
+        const { command } = req.body;
+        if (!command) return res.status(400).json({ error: 'Command is required' });
+
+        const lowerCmd = command.toLowerCase().trim();
+        let response = '';
+
+        if (lowerCmd === '/agents') {
+            const agentList = vesper.availableAgents.map(a => `${a.emoji} ${a.name} - ${a.title}`).join('\n');
+            response = `👥 **Your AI Team:**\n\n${agentList}`;
+        } else if (lowerCmd === '/status') {
+            response = `🔌 **Server Status:** ✅ Online\n📍 **API Base:** http://localhost:${PORT}\n👤 **User:** Guest`;
+        } else {
+            // Default: route through Mei
+            response = await mei.process(command);
+        }
+
+        res.json({ response });
+    } catch (error) {
+        console.error('[API /cli] Error:', error);
+        res.status(500).json({ error: 'CLI Execution failed', details: error.message });
+    }
+});
+
+/**
  * Get chat transcript (bus messages)
  */
 app.get('/api/chat/:chatId/transcript', (req, res) => {

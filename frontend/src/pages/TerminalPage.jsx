@@ -84,33 +84,22 @@ function TerminalPage() {
         // Send to backend API
         setLoading(true)
         try {
-            const response = await fetch('/api/cli', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: trimmed })
-            })
+            const data = await api.cliCommand(trimmed)
+            setConnected(true)
 
-            if (response.ok) {
-                const data = await response.json()
-                setConnected(true)
-
-                if (data.response) {
-                    // Split response into lines
-                    const lines = data.response.split('\n')
-                    lines.forEach(line => {
-                        if (line.trim()) {
-                            addOutput('response', line)
-                        }
-                    })
-                }
-            } else {
-                addOutput('error', `❌ Server error: ${response.status}`)
-                setConnected(false)
+            if (data.response) {
+                // Split response into lines
+                const lines = data.response.split('\n')
+                lines.forEach(line => {
+                    if (line.trim()) {
+                        addOutput('response', line)
+                    }
+                })
             }
         } catch (err) {
             addOutput('error', `❌ Connection failed: ${err.message}`)
-            addOutput('dim', 'The Express Code Server CLI is a local tool.')
-            addOutput('dim', 'Run "npm run cli" in your terminal to start.')
+            addOutput('dim', 'The Express Code Server CLI is a backend service.')
+            addOutput('dim', 'Ensure the server is running on port 3001.')
             setConnected(false)
         }
         setLoading(false)

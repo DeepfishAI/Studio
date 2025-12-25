@@ -444,6 +444,12 @@
     line-height: 1.5;
 }
 
+.message__content--event {
+    font-style: italic;
+    opacity: 0.9;
+    border: 1px dashed var(--color-bg-tertiary);
+}
+
 .message--user .message__content {
     background: var(--color-accent-blue);
     color: white;

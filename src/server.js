@@ -29,7 +29,6 @@ app.use(express.json());
 let userData = loadUserData();
 
 // Active chats (in-memory for now)
-// Active chats (in-memory for now)
 const activeChats = new Map();
 
 // Chat cleanup logic
@@ -112,6 +111,9 @@ app.post('/api/purchase', (req, res) => {
     }
 
     console.log(`[Purchase] Processing purchase for: ${product.name} ($${product.price})`);
+
+    // Reload user data from disk to prevent race conditions
+    userData = loadUserData();
 
     // Update user data
     userData.purchases.push({

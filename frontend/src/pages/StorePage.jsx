@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { api } from '../services/api'
 import { agents } from '../data/agents'
 import '../styles/app.css'

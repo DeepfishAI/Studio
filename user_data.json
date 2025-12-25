@@ -1,12 +1,18 @@
 {
   "email": "user@deepfish.ai",
   "tier": "starter",
-  "purchases": [],
+  "purchases": [
+    {
+      "productId": "marketing_hand",
+      "name": "Marketing Assistant",
+      "timestamp": "2025-12-25T06:14:34.387Z"
+    }
+  ],
   "capacities": {
     "any": 5,
     "hanna": 1,
     "it": 1,
     "oracle": 1,
-    "sally": 1
+    "sally": 2
   }
 }

@@ -18,6 +18,35 @@ class Orchestrator {
 
         // Setup event listeners
         this.setupEventListeners();
+
+        // Start cleanup interval
+        this.startCleanupInterval();
+    }
+
+    /**
+     * Start periodic cleanup of old completed tasks
+     */
+    startCleanupInterval() {
+        const MAX_TASK_AGE = 24 * 60 * 60 * 1000; // 24 hours
+        setInterval(() => {
+            const now = Date.now();
+            let removed = 0;
+
+            for (const [taskId, task] of this.pendingTasks.entries()) {
+                if (task.status === 'completed' && task.completedAt) {
+                    const age = now - new Date(task.completedAt).getTime();
+                    if (age > MAX_TASK_AGE) {
+                        this.pendingTasks.delete(taskId);
+                        this.internDeliverables.delete(taskId);
+                        removed++;
+                    }
+                }
+            }
+
+            if (removed > 0) {
+                console.log(`[Orchestrator] Cleaned up ${removed} old tasks.`);
+            }
+        }, 60 * 60 * 1000); // Check every hour
     }
 
     /**

@@ -213,28 +213,14 @@ export class Mei {
 
                 return response;
             } catch (err) {
-                // Fall back to mock if LLM fails
-                return this.mockResponse(input, route, agent, agentName, c);
+                // NO MOCK FALLBACK - throw the error
+                console.error(`[Mei] LLM Error:`, err.message);
+                throw new Error(`LLM unavailable: ${err.message}`);
             }
         }
 
-        // Mock response if no LLM
-        return this.mockResponse(input, route, agent, agentName, c);
-    }
-
-    mockResponse(input, route, agent, agentName, c) {
-        if (!route) {
-            return `I understand you want: "${input}"\n\n` +
-                `I'm not sure which specialist to route this to. Could you be more specific?\n` +
-                `Try mentioning: code, write, research, analyze, design, or plan.`;
-        }
-
-        const internText = route.delegate
-            ? ` I'll assign this to ${route.delegate}.`
-            : '';
-
-        return `Got it! I'll route this to ${agentName}.${internText}\n\n` +
-            `Request: "${input}"`;
+        // NO LLM available - throw error instead of mock
+        throw new Error('No LLM provider available. Please configure API keys.');
     }
 
     findRoute(input) {

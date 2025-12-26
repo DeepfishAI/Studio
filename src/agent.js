@@ -133,7 +133,8 @@ export class Agent {
     async process(input) {
         // Check LLM availability dynamically at request time, not cached
         if (!isLlmAvailable()) {
-            return this.mockResponse(input);
+            // NO MOCK - throw error if no LLM
+            throw new Error(`No LLM provider available for ${this.name}. Please configure API keys.`);
         }
 
         // Determine Model Strategy
@@ -297,9 +298,7 @@ export class Agent {
         return prompt;
     }
 
-    mockResponse(input) {
-        return `Hi! I'm ${this.name}, ${this.title}. I received your message: "${input}"\n\n(LLM is not available - this is a mock response)`;
-    }
+    // mockResponse removed - no more mock fallbacks
 }
 
 /**

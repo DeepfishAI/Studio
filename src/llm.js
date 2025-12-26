@@ -40,8 +40,8 @@ export async function chat(systemPrompt, userMessage, options = {}) {
         provider = 'anthropic'
     } = options;
 
-    // Try requested provider, fall back to any available, then MOCK
-    const providers = [provider, 'anthropic', 'gemini', 'nvidia', 'mock'];
+    // Try requested provider, fall back to any available - NO MOCK
+    const providers = [provider, 'anthropic', 'gemini', 'nvidia'];
 
     console.log(`[LLM] Starting chat. Checking providers in order: ${providers.join(', ')}`);
 
@@ -69,7 +69,8 @@ export async function chat(systemPrompt, userMessage, options = {}) {
  * Check if a provider is available
  */
 function isProviderAvailable(provider) {
-    if (provider === 'mock') return true;
+    // Mock is disabled - only check real providers
+    if (provider === 'mock') return false;
     return !!getApiKey(provider) || isProviderEnabled(provider);
 }
 
@@ -302,8 +303,8 @@ async function chatNvidia(systemPrompt, userMessage, options) {
 export function isLlmAvailable() {
     return isProviderAvailable('anthropic') ||
         isProviderAvailable('gemini') ||
-        isProviderAvailable('nvidia') ||
-        true; // Always allow (Mock fallback)
+        isProviderAvailable('nvidia');
+    // NO MOCK FALLBACK - must have real provider
 }
 
 /**
@@ -314,6 +315,6 @@ export function getAvailableProviders() {
     if (isProviderAvailable('anthropic')) providers.push('anthropic');
     if (isProviderAvailable('gemini')) providers.push('gemini');
     if (isProviderAvailable('nvidia')) providers.push('nvidia');
-    providers.push('mock');
+    // NO MOCK - only real providers
     return providers;
 }

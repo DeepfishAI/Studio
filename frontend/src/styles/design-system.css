@@ -1,4 +1,9 @@
 /* ========================================
+   Google Fonts Import (must be first)
+   ======================================== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ========================================
    DeepFish Design System v2
    Based on Uizard productivity template
    ======================================== */
@@ -769,11 +774,6 @@ h4,
         grid-template-columns: 1fr;
     }
 }
-
-/* ========================================
-   Google Fonts Import
-   ======================================== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 /* ========================================
    Login Page - Mobile First

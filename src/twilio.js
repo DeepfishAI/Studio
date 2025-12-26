@@ -465,13 +465,11 @@ export async function handleAgentConversation(req, res) {
         });
 
         try {
-            let agentResponse;
-
-            if (isLlmAvailable()) {
-                agentResponse = await agent.process(speechResult);
-            } else {
-                agentResponse = getAgentFallback(agentId, speechResult);
+            // NO FALLBACK - always use LLM
+            if (!isLlmAvailable()) {
+                throw new Error('No LLM provider available');
             }
+            const agentResponse = await agent.process(speechResult);
 
             // Log output to Bus
             eventBus.emit('bus_message', {
@@ -487,7 +485,7 @@ export async function handleAgentConversation(req, res) {
 
         } catch (err) {
             console.error(`[Voice:${agentId}] Error:`, err);
-            await addSpeech(response, "I'm having trouble thinking right now. Could you try again?", agentId, req);
+            await addSpeech(response, "I'm having trouble thinking right now. My brain circuits are offline. Please try again later.", agentId, req);
         }
     }
 
@@ -525,19 +523,7 @@ function getAgentGreeting(agentId) {
     return greetings[agentId] || "Hello! How can I help you today?";
 }
 
-/**
- * Fallback response if LLM unavailable
- */
-function getAgentFallback(agentId, input) {
-    const fallbacks = {
-        mei: "I hear you. Let me note that down and coordinate with the team.",
-        hanna: "Interesting idea! I'll sketch some concepts for that.",
-        it: "Got it. I'll architect a solution for that.",
-        sally: "Great point. I'll factor that into the strategy.",
-        oracle: "The universe has received your message. All will be revealed in time."
-    };
-    return fallbacks[agentId] || "I understand. Let me think about that.";
-}
+// getAgentFallback REMOVED - no more mock/fallback responses
 
 // ==========================================
 // CONFERENCE LOOP "The Meeting"

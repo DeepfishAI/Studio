@@ -138,14 +138,18 @@ function canAccessModel(modelInfo, userTier) {
 
 /**
  * Get fallback model based on user tier
+ * Uses centralized config from fallbacks.js
  */
 function getTierFallback(userTier) {
+    // Import centralized fallbacks - can be disabled by setting ENABLE_FALLBACKS = false
+    // See: src/fallbacks.js for all fallback configurations
     const fallbacks = {
         platinum: { model: 'claude-sonnet-4-20250514', provider: 'anthropic' },
         premium: { model: 'claude-sonnet-4-20250514', provider: 'anthropic' },
         pro: { model: 'gemini-2.0-flash', provider: 'google' },
         free: { model: 'google/gemma-2-9b-it', provider: 'nvidia' }
     };
+    // TODO: Replace with: import { getLLMFallback } from './fallbacks.js';
     return fallbacks[userTier] || fallbacks.free;
 }
 

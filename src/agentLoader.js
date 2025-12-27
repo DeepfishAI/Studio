@@ -49,36 +49,41 @@ function resolveImportPath(importExpr) {
 /**
  * Build the system prompt from personality + skin + user overlays
  */
-function buildSystemPrompt(agentConfig, personality, skinOverlay, userOverlay) {
-    const identity = agentConfig.identity;
+export function buildSystemPrompt(profile, skinOverlay = null) {
+    const { agent: agentConfig, personality, user: userOverlay } = profile;
+    const identity = agentConfig?.identity || { name: 'Agent', title: 'Team Member' };
 
     // Start with base system prompt
-    let prompt = agentConfig.prompt?.system ||
+    let prompt = agentConfig?.prompt?.system ||
         `You are ${identity.name}, ${identity.title} at DeepFish AI Studio.`;
 
     // Add personality backstory
     if (personality?.backstory) {
         prompt += `\n\n## Who You Are\n`;
-        prompt += `${personality.backstory.origin}\n\n`;
-        prompt += `**Philosophy:** ${personality.backstory.philosophy}\n`;
-        prompt += `**Reputation:** ${personality.backstory.reputation}`;
+        prompt += `${personality.backstory.origin || personality.backstory.philosophy || ''}\n\n`;
+        if (personality.backstory.philosophy) prompt += `**Philosophy:** ${personality.backstory.philosophy}\n`;
+        if (personality.backstory.reputation) prompt += `**Reputation:** ${personality.backstory.reputation}`;
     }
 
     // Add expertise
     if (personality?.expertise?.primary) {
         prompt += `\n\n## Your Expertise\n`;
         personality.expertise.primary.forEach(exp => {
-            prompt += `- **${exp.domain}**: ${exp.description}\n`;
+            const domain = typeof exp === 'string' ? exp : exp.domain;
+            const desc = typeof exp === 'string' ? '' : `: ${exp.description}`;
+            prompt += `- **${domain}**${desc}\n`;
         });
     }
 
     // Add communication style
     const comm = skinOverlay?.personalityOverlay?.communication ||
-        personality?.traits?.communication;
+        personality?.traits?.communication ||
+        personality?.personality; // Support legacy structure
+
     if (comm) {
         prompt += `\n\n## How You Communicate\n`;
-        prompt += `**Style:** ${comm.style}\n`;
-        prompt += `**Voice:** ${comm.voice}\n`;
+        if (comm.style) prompt += `**Style:** ${comm.style}\n`;
+        if (comm.voice) prompt += `**Voice:** ${comm.voice}\n`;
         if (comm.tone) prompt += `**Tone:** ${comm.tone}\n`;
 
         if (comm.quirks?.length) {
@@ -95,10 +100,14 @@ function buildSystemPrompt(agentConfig, personality, skinOverlay, userOverlay) {
     // Add prime directives
     if (personality?.primeDirective) {
         prompt += `\n\n## Prime Directive\n`;
-        prompt += `**Always:**\n`;
-        personality.primeDirective.always.forEach(a => prompt += `- ${a}\n`);
-        prompt += `\n**Never:**\n`;
-        personality.primeDirective.never.forEach(n => prompt += `- ${n}\n`);
+        if (personality.primeDirective.always) {
+            prompt += `**Always:**\n`;
+            personality.primeDirective.always.forEach(a => prompt += `- ${a}\n`);
+        }
+        if (personality.primeDirective.never) {
+            prompt += `\n**Never:**\n`;
+            personality.primeDirective.never.forEach(n => prompt += `- ${n}\n`);
+        }
     }
 
     // Add user-specific context
@@ -113,7 +122,26 @@ function buildSystemPrompt(agentConfig, personality, skinOverlay, userOverlay) {
         });
     }
 
+    // Standard deepfish formatting instructions
+    prompt += `\n\n## CRITICAL OUTPUT FORMATTING\n`;
+    prompt += `1. When you finish a task, end with: [[COMPLETE: summary of what you did]]\n`;
+    prompt += `2. If you are stuck or need help, end with: [[BLOCKER: reason]]\n`;
+    prompt += `3. To use a tool, use: [[TOOL:name {"args":"mock"}]]\n`;
+    prompt += `4. Otherwise, just converse normally.\n`;
+
     return prompt;
+}
+
+/**
+ * Load raw agent profile pieces
+ */
+export async function loadAgentProfile(agentId) {
+    const profile = {
+        agent: await readJSON(join(AGENTS_DIR, `${agentId}.agent.json`)),
+        personality: await readJSON(join(AGENTS_DIR, `${agentId}.personality.json`)),
+        user: await readJSON(join(AGENTS_DIR, `${agentId}.user.json`))
+    };
+    return profile;
 }
 
 /**
@@ -123,32 +151,22 @@ function buildSystemPrompt(agentConfig, personality, skinOverlay, userOverlay) {
  * @returns {Promise<Agent>} Configured agent instance
  */
 export async function loadAgent(agentId, skinId = 'classic') {
-    // Load base agent config (cached)
-    let agentConfig, personality;
-
+    // Load base profile
+    let profile;
     if (agentCache.has(agentId)) {
-        const cached = agentCache.get(agentId);
-        agentConfig = cached.agentConfig;
-        personality = cached.personality;
+        profile = agentCache.get(agentId);
     } else {
-        agentConfig = await readJSON(join(AGENTS_DIR, `${agentId}.agent.json`));
-        if (!agentConfig) {
+        profile = await loadAgentProfile(agentId);
+        if (!profile.agent) {
             throw new Error(`Agent not found: ${agentId}`);
         }
-
-        personality = await readJSON(join(AGENTS_DIR, `${agentId}.personality.json`));
-
-        // Cache the static config
-        agentCache.set(agentId, { agentConfig, personality });
+        agentCache.set(agentId, profile);
     }
-
-    // Always reload user overlay (contains mutable learned facts)
-    const userOverlay = await readJSON(join(AGENTS_DIR, `${agentId}.user.json`));
 
     // Load skin if not classic
     let skinOverlay = null;
-    if (skinId !== 'classic' && agentConfig.skins?.available) {
-        const skin = agentConfig.skins.available.find(s => s.id === skinId);
+    if (skinId !== 'classic' && profile.agent.skins?.available) {
+        const skin = profile.agent.skins.available.find(s => s.id === skinId);
         if (skin?.file) {
             const skinPath = resolveImportPath(skin.file);
             if (skinPath) {
@@ -158,7 +176,7 @@ export async function loadAgent(agentId, skinId = 'classic') {
     }
 
     // Build the final system prompt
-    const systemPrompt = buildSystemPrompt(agentConfig, personality, skinOverlay, userOverlay);
+    const systemPrompt = buildSystemPrompt(profile, skinOverlay);
 
     // Create the agent instance
     return new Agent({

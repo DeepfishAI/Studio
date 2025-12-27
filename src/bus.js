@@ -141,6 +141,28 @@ async function saveMessage(context, message) {
  * Bus Operations
  */
 export const BusOps = {
+    /**
+     * DISPATCH - Route a task to an agent (Core Event)
+     */
+    DISPATCH: async (agentId, taskId, content) => {
+        const context = await getTaskContext(taskId);
+        if (!context) throw new Error(`Task ${taskId} not found`);
+
+        const message = {
+            type: 'DISPATCH',
+            agentId, // Target
+            taskId,
+            content,
+            contextHash: context.contextHash,
+            timestamp: new Date().toISOString()
+        };
+
+        await saveMessage(context, message);
+        eventBus.emit('bus_message', message);
+        eventBus.emit('dispatch', message);
+        return message;
+    },
+
     // --- CUSTOM EVENT: KNOWLEDGE ---
     KNOWLEDGE: async (agentId, taskId, snippet) => {
         const context = await getTaskContext(taskId);

@@ -66,24 +66,25 @@ export function isElevenLabsEnabled() {
     return !!apiKey;
 }
 
-// ElevenLabs voice IDs for each agent
+import { getVoiceId, AGENT_GREETINGS } from './fallbacks.js';
+
+// Legacy fallback (maintained for backward compatibility if needed, but primary use is fallbacks.js)
 const ELEVENLABS_VOICES = {
-    vesper: 'GCPLhb1XrVwcoKUJYcvz',   // Custom Vesper voice
-    mei: 'ngiiW8FFLIdMew1cqwSB',      // Custom Mei voice
-    hanna: 'fCqNx624ZlenYx5PXk6M',    // Custom Hanna voice
-    it: 'LSEq6jBkWbldjNhcDwT1',       // Custom IT voice
-    sally: 'Nggzl2QAXh3OijoXD116',    // Custom Sally voice
-    oracle: 'oR4uRy4fHDUGGISL0Rev'    // Custom Oracle voice
+    vesper: getVoiceId('vesper'),
+    mei: getVoiceId('mei'),
+    hanna: getVoiceId('hanna'),
+    it: getVoiceId('it'),
+    sally: getVoiceId('sally'),
+    oracle: getVoiceId('oracle')
 };
 
-// Fallback to Polly if ElevenLabs unavailable
 const POLLY_VOICES = {
-    vesper: 'Polly.Joanna',
-    mei: 'Polly.Salli',
-    hanna: 'Polly.Kendra',
-    it: 'Polly.Matthew',
-    sally: 'Polly.Kimberly',
-    oracle: 'Polly.Brian'
+    vesper: getVoiceId('vesper', true),
+    mei: getVoiceId('mei', true),
+    hanna: getVoiceId('hanna', true),
+    it: getVoiceId('it', true),
+    sally: getVoiceId('sally', true),
+    oracle: getVoiceId('oracle', true)
 };
 
 // In-memory request cache (audioId -> { text, voiceId, createdAt })
@@ -513,14 +514,7 @@ export async function handleAgentConversation(req, res) {
  * Get agent greeting for phone
  */
 function getAgentGreeting(agentId) {
-    const greetings = {
-        mei: "Hi there! Mei here, your project manager. What are we working on today?",
-        hanna: "Hey! Hanna speaking, Creative Director. What kind of visual magic can I help you with?",
-        it: "IT here. Principal Architect. What system do you need built?",
-        sally: "Hey hi Sally, what's up?",
-        oracle: "I have been expecting your call. I am Oracle. What wisdom do you seek?"
-    };
-    return greetings[agentId] || "Hello! How can I help you today?";
+    return AGENT_GREETINGS[agentId] || AGENT_GREETINGS.default;
 }
 
 // getAgentFallback REMOVED - no more mock/fallback responses

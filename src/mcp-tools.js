@@ -114,12 +114,15 @@ export async function browse(action, target) {
     };
 }
 
+import { BusOps, eventBus, createTaskContext } from './bus.js';
+
 /**
  * BUS Tool
  * Algebraic communication bus for inter-agent coordination
+ * Wraps the unified bus logic in src/bus.js
  */
-export async function bus(operation, payload, taskId = null, contextHash = null) {
-    const validOps = ['ASSERT', 'QUERY', 'VALIDATE', 'CORRECT', 'ACK'];
+export async function bus(operation, payload, taskId = null) {
+    const validOps = ['ASSERT', 'QUERY', 'VALIDATE', 'CORRECT', 'ACK', 'COMPLETE', 'BLOCKER'];
 
     if (!validOps.includes(operation)) {
         return {
@@ -129,47 +132,32 @@ export async function bus(operation, payload, taskId = null, contextHash = null)
         };
     }
 
-    // Generate task ID if not provided
-    const id = taskId || `task_${Date.now()}`;
-
-    // Generate context hash for integrity verification
-    const hash = contextHash || createHash('sha256')
-        .update(JSON.stringify(payload) + id)
-        .digest('hex')
-        .substring(0, 16);
-
-    // Store message
-    const message = {
-        id: `msg_${Date.now()}`,
-        taskId: id,
-        operation,
-        payload,
-        contextHash: hash,
-        timestamp: new Date().toISOString()
-    };
-
-    busState.messages.push(message);
-
-    // Keep only last 100 messages
-    if (busState.messages.length > 100) {
-        busState.messages = busState.messages.slice(-100);
+    // Generate task context if none exists (usually created by Mei)
+    let contextTaskId = taskId;
+    if (!contextTaskId) {
+        const context = await createTaskContext(typeof payload === 'string' ? payload : JSON.stringify(payload));
+        contextTaskId = context.taskId;
     }
 
-    // Track context for task
-    if (!busState.taskContexts.has(id)) {
-        busState.taskContexts.set(id, { hash, messages: [] });
+    // Execute through unified BusOps
+    const opFunc = BusOps[operation];
+    if (!opFunc) {
+        return { success: false, error: `Operation ${operation} not implemented in BusOps` };
     }
-    busState.taskContexts.get(id).messages.push(message);
+
+    // Agent ID is usually inferred from the context of who is calling the tool
+    // but for the tool call we just use 'system' or the caller
+    const agentId = 'agent';
+
+    const message = await opFunc(agentId, contextTaskId, payload);
 
     return {
         success: true,
         tool: 'bus',
         result: {
             operation,
-            messageId: message.id,
-            taskId: id,
-            contextHash: hash,
-            busSize: busState.messages.length,
+            messageId: message.timestamp,
+            taskId: contextTaskId,
             status: 'delivered'
         }
     };
@@ -178,27 +166,20 @@ export async function bus(operation, payload, taskId = null, contextHash = null)
 /**
  * Get bus status and recent messages
  */
-export function getBusStatus() {
+export async function getBusStatus() {
+    const { getTaskSummaries, getAllLogs } = await import('./bus.js');
     return {
-        totalMessages: busState.messages.length,
-        activeTasks: busState.taskContexts.size,
-        recentMessages: busState.messages.slice(-10),
-        tasks: Array.from(busState.taskContexts.keys())
+        tasks: getTaskSummaries(),
+        recentLogs: getAllLogs(10)
     };
 }
 
 /**
  * Clear bus for a task
+ * No longer directly clears memory - relies on the orchestrator lifecycle
  */
 export function clearBus(taskId = null) {
-    if (taskId) {
-        busState.taskContexts.delete(taskId);
-        busState.messages = busState.messages.filter(m => m.taskId !== taskId);
-    } else {
-        busState.messages = [];
-        busState.taskContexts.clear();
-    }
-    return { success: true, cleared: taskId || 'all' };
+    return { success: true, message: "Use the orchestrator to manage task lifecycle" };
 }
 
 /**

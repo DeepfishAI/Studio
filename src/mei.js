@@ -238,6 +238,58 @@ export class Mei {
         return agent.interns.find(i => i.id === internId);
     }
 
+    /**
+     * Estimate how long a task will take for a given agent
+     * @param {string} agentId - The agent ID
+     * @param {string} task - The task description
+     * @returns {Promise<number>} Estimated duration in seconds
+     */
+    async estimateTaskDuration(agentId, task) {
+        if (!isLlmAvailable()) {
+            console.warn('[Mei] No LLM available for estimation, using default 30s');
+            return 30;
+        }
+
+        try {
+            const estimationPrompt = `You are an expert project manager estimating task duration.
+
+Agent: ${agentId}
+Task: "${task}"
+
+Based on the agent's role and the task complexity, estimate how many SECONDS this will take.
+Consider:
+- ${agentId === 'it' ? 'Technical implementation complexity' : ''}
+- ${agentId === 'hanna' ? 'Creative design iteration time' : ''}
+- ${agentId === 'sally' ? 'Marketing strategy development' : ''}
+- LLM API response time (typically 3-10 seconds)
+- Agent processing overhead
+
+Respond with ONLY a number representing seconds. Examples: 15, 30, 45, 60
+
+No explanations, just the number.`;
+
+            const response = await chat(
+                'You are a precise estimation assistant. You only output numbers.',
+                estimationPrompt,
+                { maxTokens: 10 }
+            );
+
+            const estimated = parseInt(response.trim());
+
+            if (isNaN(estimated) || estimated < 5 || estimated > 300) {
+                console.warn(`[Mei] Got invalid estimate "${response}", using default 30s`);
+                return 30;
+            }
+
+            console.log(`[Mei] ⏱️  Estimated ${agentId} will take ${estimated}s for: "${task.substring(0, 50)}..."`);
+            return estimated;
+
+        } catch (err) {
+            console.error('[Mei] Estimation failed:', err.message);
+            return 30; // Default fallback
+        }
+    }
+
     listAgents(c = null) {
         const officers = this.agents.filter(a => a.role === 'officer');
         const managers = this.agents.filter(a => a.role === 'manager');

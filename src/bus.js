@@ -444,6 +444,33 @@ export const BusOps = {
     },
 
     /**
+     * SPAWN_HELPER - Request agent to spawn a helper instance
+     */
+    SPAWN_HELPER: async (agentId, taskId, reason) => {
+        const context = await getTaskContext(taskId);
+        if (!context) throw new Error(`Task ${taskId} not found`);
+
+        const message = {
+            type: 'SPAWN_HELPER',
+            agentId,
+            taskId,
+            reason,
+            contextHash: context.contextHash,
+            timestamp: new Date().toISOString()
+        };
+
+        await saveMessage(context, message);
+
+        // Emit event - agent should listen for this
+        eventBus.emit('bus_message', message);
+        eventBus.emit('spawn_helper', message);
+
+        console.log(`[Bus] 🚨 Spawn helper requested for ${agentId} on task ${taskId}: ${reason}`);
+
+        return message;
+    },
+
+    /**
      * WAKE - Explicit wake signal (for hydration/recovery)
      */
     WAKE: async () => {
@@ -556,4 +583,45 @@ export function getTaskSummaries() {
         });
     });
     return summaries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+/**
+ * Monitor task progress and trigger helper spawn if agent is slow
+ * @param {string} agentId - The agent ID
+ * @param {string} taskId - The task ID
+ * @param {number} estimatedDuration - Estimated duration in seconds
+ * @param {number} thresholdMultiplier - Progress threshold multiplier (default 1.5)
+ */
+export function monitorTaskProgress(agentId, taskId, estimatedDuration, thresholdMultiplier = 1.5) {
+    const threshold = estimatedDuration * thresholdMultiplier;
+    const thresholdMs = threshold * 1000;
+
+    console.log(`[Bus] 👀 Monitoring ${agentId} on task ${taskId} (estimate: ${estimatedDuration}s, threshold: ${threshold.toFixed(1)}s)`);
+
+    const timerId = setTimeout(async () => {
+        // Check if task is still in progress
+        const context = await getTaskContext(taskId);
+
+        if (context && context.status === 'active') {
+            // Task is still running - request helper spawn
+            console.log(`[Bus] ⚠️  ${agentId} exceeded threshold (${threshold.toFixed(1)}s) - requesting helper spawn`);
+
+            try {
+                await BusOps.SPAWN_HELPER(
+                    agentId,
+                    taskId,
+                    `Exceeded ${threshold.toFixed(1)}s threshold (estimate was ${estimatedDuration}s)`
+                );
+            } catch (err) {
+                console.error(`[Bus] Failed to request helper spawn:`, err.message);
+            }
+        } else if (context) {
+            console.log(`[Bus] ✅ ${agentId} completed task ${taskId} on time (status: ${context.status})`);
+        }
+    }, thresholdMs);
+
+    // Store timer ID in case we need to cancel it
+    busState.taskContexts.get(taskId)._progressTimerId = timerId;
+
+    return timerId;
 }

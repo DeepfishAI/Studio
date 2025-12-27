@@ -44,8 +44,11 @@ export function generateContextHash(originalRequest, taskId) {
 
 /**
  * Create a new task context
+ * @param {string} originalRequest - The original user request
+ * @param {string} parentTaskId - Optional parent task ID for child tasks
+ * @returns {Object} The created task context
  */
-export async function createTaskContext(originalRequest) {
+export async function createTaskContext(originalRequest, parentTaskId = null) {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const contextHash = generateContextHash(originalRequest, taskId);
 
@@ -55,20 +58,33 @@ export async function createTaskContext(originalRequest) {
         originalRequest,
         createdAt: new Date().toISOString(),
         messages: [],
-        status: 'active'
+        status: 'active',
+        // Parent-child relationship tracking
+        parentTaskId,
+        childTaskIds: [],
+        childrenComplete: 0,
+        deliverables: [] // Store child deliverables for aggregation
     };
 
     // 1. Update Memory
     busState.taskContexts.set(taskId, context);
 
-    // 2. Persist to Redis (if available)
+    // 2. If this is a child task, register with parent
+    if (parentTaskId) {
+        const parent = busState.taskContexts.get(parentTaskId);
+        if (parent) {
+            parent.childTaskIds.push(taskId);
+        }
+    }
+
+    // 3. Persist to Redis (if available)
     if (redis) {
         await redis.set(`task:${taskId}:context`, JSON.stringify(context));
         await redis.sadd('active_tasks', taskId); // Track active inputs
     }
 
     // Emit task created event
-    eventBus.emit('task_created', { taskId, contextHash, originalRequest });
+    eventBus.emit('task_created', { taskId, contextHash, originalRequest, parentTaskId });
 
     return context;
 }
@@ -375,6 +391,29 @@ export const BusOps = {
         eventBus.emit('bus_message', message);
         eventBus.emit('complete', message);
         eventBus.emit('task_complete', { taskId, agentId, deliverable });
+
+        // 🆕 PARENT NOTIFICATION: If this task has a parent, notify it
+        if (context.parentTaskId) {
+            const parent = await getTaskContext(context.parentTaskId);
+            if (parent) {
+                parent.childrenComplete++;
+                parent.deliverables.push({ agentId, taskId, deliverable });
+
+                // Update parent in Redis
+                if (redis) {
+                    await redis.set(`task:${context.parentTaskId}:context`, JSON.stringify(parent));
+                }
+
+                // Check if all children are done
+                if (parent.childrenComplete === parent.childTaskIds.length) {
+                    console.log(`[Bus] All children complete for parent ${context.parentTaskId}. Triggering aggregation.`);
+                    eventBus.emit('all_children_complete', {
+                        parentTaskId: context.parentTaskId,
+                        deliverables: parent.deliverables
+                    });
+                }
+            }
+        }
 
         return message;
     },

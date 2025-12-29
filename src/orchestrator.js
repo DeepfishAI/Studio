@@ -380,22 +380,19 @@ class Orchestrator {
             }
         }
 
-        // 2. Build Context
-        const context = `
-You are ${agent.name}, ${agent.title}.
-TASK ID: ${taskId}
+        // 2. Build Context (include task context for agent)
+        const fullContext = `TASK ID: ${taskId}
 INSTRUCTIONS: ${instructions}
 ${knowledgeContext}
+Your goal is to COMPLETE this task using your skills and tools.
+If you need to create files, USE the write_file tool.
+If you are done, end with [[COMPLETE: summary]].
+If blocked, end with [[BLOCKER: reason]].`;
 
-Your goal is to COMPLETE this task using your skills.
-If you need to ask a question, use [[QUERY: target | question]].
-If you are done, use [[COMPLETE: deliverable summary]].
-If you need more time/steps, simply describe what you are doing.
-`;
-
-        // 3. Think (LLM Call)
-        console.log(`[Orchestrator] ${agentId} is thinking...`);
-        const response = await chat(agent.prompt?.system || `You are ${agentId}. Act professionally.`, context);
+        // 3. Think (Use agent.process() to include tools + action mode)
+        // This ensures tool instructions are in the prompt and [[TOOL:...]] is parsed
+        console.log(`[Orchestrator] ${agentId} is thinking (with tools enabled)...`);
+        const response = await agent.process(fullContext);
 
         // --- BRIDGE: SAFETY CHECK (OUTPUT) ---
         if (agent.safety?.enabled) {
@@ -407,7 +404,10 @@ If you need more time/steps, simply describe what you are doing.
             }
         }
 
-        // 4. Act (Parse Response)
+        // 4. Act (Parse Response for bus operations)
+        // Note: [[TOOL:...]] is already handled by agent.process()
+        // We just need to handle bus-specific commands
+
         // Check for COMPLETE
         if (response.includes('[[COMPLETE:')) {
             const match = response.match(/\[\[COMPLETE:\s*(.+?)\]\]/is);
@@ -423,6 +423,12 @@ If you need more time/steps, simply describe what you are doing.
                 // Fallback: just post message
                 await BusOps.ASSERT(agentId, taskId, response);
             }
+        }
+        // Check for BLOCKER
+        else if (response.includes('[[BLOCKER:')) {
+            const match = response.match(/\[\[BLOCKER:\s*(.+?)\]\]/is);
+            const reason = match ? match[1] : 'Unknown blocker';
+            await BusOps.BLOCKER(agentId, taskId, reason);
         }
         // Metadata / Status Update / Partial Work
         else {

@@ -56,6 +56,12 @@ export const MAX_LEADS = 21; // 1 Admin + 20 Beta Testers
  * Checks x-admin-secret header or ?key= query param
  */
 const requireAdmin = (req, res, next) => {
+    // Fail closed if secret not configured
+    if (!ADMIN_SECRET) {
+        console.warn(`[Security] Admin access blocked - ADMIN_SECRET not configured`);
+        return res.status(503).json({ error: 'Admin endpoints disabled: ADMIN_SECRET not configured' });
+    }
+
     const authHeader = req.headers['x-admin-secret'];
     const queryKey = req.query.key;
 
@@ -93,27 +99,36 @@ app.post('/api/leads', (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    // Sanitize: lowercase and trim
+    const sanitizedEmail = email.toLowerCase().trim();
+
     // 🛑 SAFETY CAP: Limit to 20 new users
-    if (BETA_LEADS.size >= MAX_LEADS && !BETA_LEADS.has(email)) {
-        console.warn(`[Beta] Signup Rejected: Limit Reached (${BETA_LEADS.size}/${MAX_LEADS}). Email: ${email}`);
+    if (BETA_LEADS.size >= MAX_LEADS && !BETA_LEADS.has(sanitizedEmail)) {
+        console.warn(`[Beta] Signup Rejected: Limit Reached (${BETA_LEADS.size}/${MAX_LEADS}). Email: ${sanitizedEmail}`);
         return res.status(403).json({
             error: 'Beta Full',
             message: 'We have reached our limit of 20 beta testers. You have been added to the extended waitlist.'
         });
     }
 
-    console.log(`[Beta] New Lead Joined: ${email}`);
+    console.log(`[Beta] New Lead Joined: ${sanitizedEmail}`);
 
     // Alert Admin via SMS
-    if (!BETA_LEADS.has(email)) {
-        sendSms(ADMIN_PHONE, `🚀 New Pilot: ${email} (${BETA_LEADS.size + 1}/${MAX_LEADS})`).catch(err => console.error(err));
+    if (!BETA_LEADS.has(sanitizedEmail)) {
+        sendSms(ADMIN_PHONE, `🚀 New Pilot: ${sanitizedEmail} (${BETA_LEADS.size + 1}/${MAX_LEADS})`).catch(err => console.error(err));
     }
 
-    BETA_LEADS.add(email);
+    BETA_LEADS.add(sanitizedEmail);
 
     // BACKUP: Mirror to Redis
     if (redis) {
-        redis.sadd('beta_leads', email).catch(err => console.error('[Redis] Save failed:', err));
+        redis.sadd('beta_leads', sanitizedEmail).catch(err => console.error('[Redis] Save failed:', err));
     }
 
     // In a real app, this would trigger a "Welcome" email via SendGrid/Resend

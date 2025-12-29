@@ -553,6 +553,28 @@ export const BusOps = {
         console.log(`[Bus] 🔄 Revision requested from ${agentId} for session ${sessionId}`);
 
         return message;
+    },
+
+    /**
+     * DISCUSS - Agent contributes to discussion (responds, proposes, argues)
+     */
+    DISCUSS: async (sessionId, agentId, comment, replyTo = null, proposedChange = null) => {
+        const message = {
+            type: 'DISCUSS',
+            sessionId,
+            agentId,
+            comment: comment.substring(0, 1000),
+            replyTo,
+            hasProposedChange: !!proposedChange,
+            timestamp: new Date().toISOString()
+        };
+
+        eventBus.emit('bus_message', message);
+        eventBus.emit('consensus_discuss', { sessionId, agentId, comment, replyTo, proposedChange });
+
+        console.log(`[Bus] 💬 ${agentId} discussing in session ${sessionId}${replyTo ? ` (reply to ${replyTo})` : ''}`);
+
+        return message;
     }
 };
 

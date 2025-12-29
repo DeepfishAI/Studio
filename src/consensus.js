@@ -4,12 +4,14 @@
  * Enables multi-agent collaborative development through iterative
  * revision cycles until unanimous approval.
  * 
- * Flow:
+ * ENHANCED FLOW (based on Agent4Debate & D3 academic patterns):
  * 1. Create session with participating agents
  * 2. First agent produces work, calls PROPOSE
  * 3. All agents vote (approve/reject with feedback)
- * 4. If rejected: revision loop until consensus
- * 5. On consensus: Mei reviews and delivers
+ * 4. If rejected: DISCUSSION PHASE - agents debate and propose changes
+ * 5. After discussion: assigned agent revises incorporating feedback
+ * 6. Loop back to step 3 until consensus
+ * 7. On consensus: Mei reviews and delivers
  */
 
 import { eventBus } from './bus.js';
@@ -21,6 +23,8 @@ const sessions = new Map();
 const DEFAULT_CONFIG = {
     maxRounds: 5,
     votingTimeoutMs: 60000,
+    discussionTimeoutMs: 120000,  // 2 min for discussion
+    maxDiscussionTurns: 3,        // Max back-and-forth per round
     requireUnanimous: true
 };
 
@@ -43,7 +47,8 @@ export function createConsensusSession(taskId, agents, prompt, config = {}) {
         config: { ...DEFAULT_CONFIG, ...config },
 
         revisions: [],
-        status: 'initialized', // initialized | drafting | voting | revising | approved | deadlocked
+        discussions: [],  // NEW: Track discussion threads
+        status: 'initialized', // initialized | drafting | voting | discussing | revising | approved | deadlocked
 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -272,29 +277,195 @@ export function checkConsensus(sessionId) {
         };
     }
 
-    // Revision needed
+    // NOT UNANIMOUS: Start Discussion Phase (NEW - D3 pattern)
+    session.status = 'discussing';
+    session.updatedAt = new Date().toISOString();
+
+    // Initialize discussion thread for this round
+    const discussionThread = {
+        round: session.currentRound,
+        startedAt: new Date().toISOString(),
+        comments: [],
+        turnCount: 0,
+        concluded: false
+    };
+    session.discussions.push(discussionThread);
+
+    // Aggregate initial feedback as discussion starters
+    const voteEntries = Array.from(currentRevision.votes.entries());
+
+    console.log(`[Consensus] 💬 DISCUSSION PHASE started for round ${session.currentRound}`);
+    console.log(`[Consensus] Rejections to discuss: ${rejections.length}`);
+
+    eventBus.emit('consensus_discussion_started', {
+        sessionId,
+        taskId: session.taskId,
+        round: session.currentRound,
+        workProduct: currentRevision.workProduct,
+        votes: voteEntries.map(([agentId, vote]) => ({
+            agentId,
+            approved: vote.approved,
+            feedback: vote.feedback
+        }))
+    });
+
+    return {
+        status: 'discussing',
+        round: session.currentRound,
+        rejections: rejections.map(r => r.feedback)
+    };
+}
+
+// ====================================
+// DISCUSSION PHASE FUNCTIONS
+// ====================================
+
+/**
+ * Add a comment to the discussion thread
+ * Agents can respond to feedback, propose changes, or defend positions
+ * 
+ * @param {string} sessionId - Session ID
+ * @param {string} agentId - Commenting agent
+ * @param {string} comment - The comment/argument
+ * @param {string} replyTo - Optional: agent ID being replied to
+ * @param {object} proposedChange - Optional: specific code/change proposal
+ */
+export function addDiscussionComment(sessionId, agentId, comment, replyTo = null, proposedChange = null) {
+    const session = sessions.get(sessionId);
+    if (!session) throw new Error(`Session ${sessionId} not found`);
+    if (session.status !== 'discussing') throw new Error('Session not in discussion phase');
+
+    const currentDiscussion = session.discussions[session.discussions.length - 1];
+    if (!currentDiscussion) throw new Error('No active discussion');
+
+    const entry = {
+        id: `comment_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        agentId,
+        comment,
+        replyTo,
+        proposedChange,
+        timestamp: new Date().toISOString()
+    };
+
+    currentDiscussion.comments.push(entry);
+    currentDiscussion.turnCount++;
+    session.updatedAt = new Date().toISOString();
+
+    console.log(`[Consensus] 💬 ${agentId}: "${comment.substring(0, 80)}..."`);
+    if (replyTo) console.log(`[Consensus]    ↳ replying to ${replyTo}`);
+    if (proposedChange) console.log(`[Consensus]    📝 Includes proposed change`);
+
+    eventBus.emit('consensus_comment_added', {
+        sessionId,
+        round: session.currentRound,
+        entry
+    });
+
+    // Check if discussion limit reached
+    if (currentDiscussion.turnCount >= session.config.maxDiscussionTurns * session.agents.length) {
+        console.log(`[Consensus] Discussion limit reached (${currentDiscussion.turnCount} turns)`);
+        return concludeDiscussion(sessionId);
+    }
+
+    return entry;
+}
+
+/**
+ * Conclude discussion and move to revision phase
+ * @param {string} sessionId - Session ID
+ * @param {string} assignedReviser - Optional: specific agent to handle revision
+ */
+export function concludeDiscussion(sessionId, assignedReviser = null) {
+    const session = sessions.get(sessionId);
+    if (!session) throw new Error(`Session ${sessionId} not found`);
+
+    const currentDiscussion = session.discussions[session.discussions.length - 1];
+    if (currentDiscussion) {
+        currentDiscussion.concluded = true;
+        currentDiscussion.concludedAt = new Date().toISOString();
+    }
+
     session.status = 'revising';
     session.updatedAt = new Date().toISOString();
 
-    // Aggregate feedback
-    const aggregatedFeedback = rejections.map(r => r.feedback).join('\n\n');
+    // Compile discussion summary for the reviser
+    const discussionSummary = compileDiscussionSummary(sessionId);
 
-    console.log(`[Consensus] Revision needed. Aggregated feedback sent.`);
+    // Determine who revises (author or assigned)
+    const currentRevision = session.revisions[session.revisions.length - 1];
+    const reviser = assignedReviser || currentRevision.author;
+
+    console.log(`[Consensus] Discussion concluded after ${currentDiscussion?.turnCount || 0} comments`);
+    console.log(`[Consensus] ✏️ ${reviser} assigned to revise`);
 
     eventBus.emit('consensus_revision_needed', {
         sessionId,
         taskId: session.taskId,
         round: session.currentRound,
         currentWorkProduct: currentRevision.workProduct,
-        feedback: aggregatedFeedback,
-        rejectedBy: rejections.length
+        feedback: getAggregatedFeedback(sessionId),
+        discussionSummary,
+        assignedReviser: reviser
     });
 
     return {
         status: 'revising',
         round: session.currentRound,
-        feedback: aggregatedFeedback
+        reviser,
+        discussionSummary
     };
+}
+
+/**
+ * Compile discussion into a structured summary for the reviser
+ */
+export function compileDiscussionSummary(sessionId) {
+    const session = sessions.get(sessionId);
+    if (!session) return '';
+
+    const currentDiscussion = session.discussions[session.discussions.length - 1];
+    if (!currentDiscussion) return '';
+
+    const currentRevision = session.revisions[session.revisions.length - 1];
+    const votes = currentRevision ? Array.from(currentRevision.votes.entries()) : [];
+
+    let summary = '## Discussion Summary\n\n';
+
+    // Add vote summary
+    summary += '### Initial Votes\n';
+    for (const [agentId, vote] of votes) {
+        summary += `- **${agentId}**: ${vote.approved ? '✓ APPROVE' : '✗ REJECT'}`;
+        if (vote.feedback && vote.feedback !== 'Author submission') {
+            summary += ` - "${vote.feedback}"`;
+        }
+        summary += '\n';
+    }
+
+    // Add discussion comments
+    if (currentDiscussion.comments.length > 0) {
+        summary += '\n### Discussion Points\n';
+        for (const entry of currentDiscussion.comments) {
+            const replyPrefix = entry.replyTo ? `  ↳ @${entry.replyTo}: ` : '';
+            summary += `- **${entry.agentId}**: ${replyPrefix}${entry.comment}\n`;
+            if (entry.proposedChange) {
+                summary += `  📝 Proposed: \`\`\`${JSON.stringify(entry.proposedChange)}\`\`\`\n`;
+            }
+        }
+    }
+
+    // Extract action items
+    const proposedChanges = currentDiscussion.comments
+        .filter(c => c.proposedChange)
+        .map(c => ({ agent: c.agentId, change: c.proposedChange }));
+
+    if (proposedChanges.length > 0) {
+        summary += '\n### Proposed Changes to Incorporate\n';
+        proposedChanges.forEach((p, i) => {
+            summary += `${i + 1}. From ${p.agent}: ${JSON.stringify(p.change)}\n`;
+        });
+    }
+
+    return summary;
 }
 
 /**

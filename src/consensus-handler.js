@@ -24,6 +24,40 @@ let handlerRegistered = false;
 // Cache of agent instances for revision work
 const agentCache = new Map();
 
+// ═══════════════════════════════════════════════════════════════
+// TOGGLE 3: REVIEWER PERSONAS (arXiv:2406.12708 AgentReview)
+// Different review styles for diversity - 37% impact on decision variance
+// ═══════════════════════════════════════════════════════════════
+const REVIEWER_PERSONAS = {
+    strict_expert: {
+        description: 'rigorous expert who identifies technical flaws',
+        prompt: `You are a RIGOROUS EXPERT reviewer. You have deep technical knowledge 
+and will identify flaws others miss. You hold work to HIGH STANDARDS.
+Do not approve unless the work is genuinely excellent and complete.`
+    },
+    supportive_mentor: {
+        description: 'supportive reviewer focused on improvement',
+        prompt: `You are a SUPPORTIVE MENTOR reviewer. While you catch issues,
+your feedback aims to HELP IMPROVE the work. Look for potential, not just flaws.
+Be constructive and encouraging while still noting what needs fixing.`
+    },
+    efficiency_focused: {
+        description: 'practical reviewer focused on outcomes',
+        prompt: `You are a PRACTICAL EFFICIENCY-FOCUSED reviewer. Focus on whether 
+the work accomplishes its stated goal. Don't nitpick minor style issues.
+Approve if it works correctly, even if not perfectly polished.`
+    }
+};
+
+// Map agents to personas for diversity
+const AGENT_PERSONA_MAP = {
+    'it': 'strict_expert',        // Technical precision
+    'hanna': 'supportive_mentor', // Creative improvement
+    'sally': 'efficiency_focused', // Practical outcomes
+    'oracle': 'strict_expert',     // Research rigor
+    'glitch': 'efficiency_focused' // Gets it done
+};
+
 /**
  * Get or create an agent instance
  */
@@ -34,6 +68,42 @@ async function getAgent(agentId) {
         agentCache.set(agentId, agent);
     }
     return agentCache.get(agentId);
+}
+
+/**
+ * TOGGLE 1: Get confidence score from LLM (DOWN paper arXiv:2504.05047)
+ * 
+ * For APIs that don't expose logits, we use verbalized confidence.
+ * Agent rates its own confidence on the work product quality.
+ */
+async function getConfidenceScore(agent, workProduct, prompt) {
+    try {
+        const confidencePrompt = `
+You just reviewed a work product. Rate your CONFIDENCE that it correctly and completely addresses the request.
+
+ORIGINAL REQUEST:
+${prompt?.substring(0, 500) || 'Complete the task correctly'}
+
+WORK PRODUCT PREVIEW:
+${workProduct?.substring(0, 800) || 'No work product'}
+
+Rate confidence from 0.0 (completely uncertain) to 1.0 (completely certain).
+Consider: Is this complete? Correct? Well-done?
+
+Respond with ONLY a decimal number (e.g., 0.85). Nothing else.`;
+
+        const response = await agent.process(confidencePrompt);
+        const match = response.match(/0?\\.?\\d+/);
+        if (match) {
+            const score = parseFloat(match[0]);
+            return Math.min(1.0, Math.max(0.0, score));
+        }
+    } catch (err) {
+        console.warn('[ConsensusHandler] Confidence extraction failed:', err.message);
+    }
+
+    // Default: medium confidence (triggers debate)
+    return 0.5;
 }
 
 /**
@@ -105,10 +175,30 @@ export function registerConsensusHandlers() {
     eventBus.on('consensus_review_requested', async (data) => {
         console.log(`\n[ConsensusHandler] Review requested from ${data.reviewerId}`);
 
+        const session = getSession(data.sessionId);
+
         try {
             const reviewer = await getAgent(data.reviewerId);
 
-            const reviewPrompt = buildReviewPrompt(data);
+            // ═══════════════════════════════════════════════════════════════
+            // TOGGLE 1: CONFIDENCE THRESHOLD SKIP (DOWN paper - 6x efficiency)
+            // ═══════════════════════════════════════════════════════════════
+            if (session?.config?.enableConfidenceSkip && data.isInitialResponse) {
+                const confidence = await getConfidenceScore(reviewer, data.workProduct, data.prompt);
+                const threshold = session.config.confidenceThreshold || 0.85;
+
+                console.log(`[ConsensusHandler] Confidence check: ${(confidence * 100).toFixed(1)}% (threshold: ${threshold * 100}%)`);
+
+                if (confidence > threshold) {
+                    console.log(`[ConsensusHandler] ⚡ SKIPPING DEBATE - high confidence (DOWN optimization)`);
+                    const { castVote } = await import('./consensus.js');
+                    castVote(data.sessionId, data.reviewerId, true, 'High confidence auto-approve', Math.round(confidence * 100));
+                    return;
+                }
+            }
+
+            // Build review prompt with persona if enabled
+            const reviewPrompt = buildReviewPrompt(data, session?.config?.enableReviewerPersonas ? data.reviewerId : null);
             const reviewResponse = await reviewer.process(reviewPrompt);
 
             // Parse the structured response
@@ -238,11 +328,29 @@ REVISED WORK PRODUCT:
 
 /**
  * Build a review prompt for an agent evaluating work
+ * @param {object} data - Review data
+ * @param {string|null} agentId - Optional agentId for persona injection
  */
-function buildReviewPrompt(data) {
-    return `
-You are reviewing a work product from a peer. Evaluate critically but fairly.
+function buildReviewPrompt(data, agentId = null) {
+    // TOGGLE 3: Inject reviewer persona for diversity
+    let personaPreamble = '';
+    if (agentId && AGENT_PERSONA_MAP[agentId]) {
+        const personaKey = AGENT_PERSONA_MAP[agentId];
+        const persona = REVIEWER_PERSONAS[personaKey];
+        if (persona) {
+            personaPreamble = `
+═══════════════════════════════════════════════════════════════
+YOUR REVIEWER ROLE
+═══════════════════════════════════════════════════════════════
+${persona.prompt}
 
+`;
+        }
+    }
+
+    return `
+You are reviewing a work product from a peer.
+${personaPreamble}
 ═══════════════════════════════════════════════════════════════
 ORIGINAL REQUEST
 ═══════════════════════════════════════════════════════════════

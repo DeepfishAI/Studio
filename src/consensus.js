@@ -25,7 +25,24 @@ const DEFAULT_CONFIG = {
     votingTimeoutMs: 60000,
     discussionTimeoutMs: 120000,  // 2 min for discussion
     maxDiscussionTurns: 3,        // Max back-and-forth per round
-    requireUnanimous: true
+    requireUnanimous: true,
+
+    // ═══════════════════════════════════════════════════════════════
+    // RESEARCH-BACKED IMPROVEMENTS (arXiv:2504.05047, arXiv:2406.12708)
+    // ═══════════════════════════════════════════════════════════════
+
+    // Toggle 1: Confidence Threshold Skip (DOWN paper - 6x efficiency)
+    // If initial response confidence > threshold, skip debate entirely
+    enableConfidenceSkip: true,
+    confidenceThreshold: 0.85,     // Paper recommends 0.7-0.9
+
+    // Toggle 2: Weighted Voting
+    // Weight votes by agent confidence scores instead of equal weight
+    enableWeightedVoting: true,
+
+    // Toggle 3: Reviewer Personas
+    // Assign different review styles for diversity
+    enableReviewerPersonas: true
 };
 
 /**
@@ -224,11 +241,41 @@ export function checkConsensus(sessionId) {
     if (!currentRevision) throw new Error('No active revision');
 
     const votes = Array.from(currentRevision.votes.values());
-    const approvals = votes.filter(v => v.approved).length;
-    const rejections = votes.filter(v => !v.approved);
 
-    const unanimous = rejections.length === 0;
-    const approved = session.config.requireUnanimous ? unanimous : approvals > rejections.length;
+    let approved;
+    let approvals, rejections;
+
+    // Toggle 2: Weighted Voting (arXiv research)
+    if (session.config.enableWeightedVoting) {
+        // Weight votes by confidence scores
+        let approveWeight = 0;
+        let rejectWeight = 0;
+
+        for (const vote of votes) {
+            const weight = (vote.confidence || 50) / 100;  // Normalize to 0-1
+            if (vote.approved) {
+                approveWeight += weight;
+            } else {
+                rejectWeight += weight;
+            }
+        }
+
+        approvals = votes.filter(v => v.approved).length;
+        rejections = votes.filter(v => !v.approved);
+
+        // Weighted decision
+        const unanimous = rejectWeight === 0;
+        approved = session.config.requireUnanimous ? unanimous : approveWeight > rejectWeight;
+
+        console.log(`[Consensus] Weighted votes: approve=${approveWeight.toFixed(2)}, reject=${rejectWeight.toFixed(2)}`);
+    } else {
+        // Original equal-weight voting
+        approvals = votes.filter(v => v.approved).length;
+        rejections = votes.filter(v => !v.approved);
+
+        const unanimous = rejections.length === 0;
+        approved = session.config.requireUnanimous ? unanimous : approvals > rejections.length;
+    }
 
     console.log(`[Consensus] Round ${session.currentRound} result: ${approvals} approve, ${rejections.length} reject`);
 

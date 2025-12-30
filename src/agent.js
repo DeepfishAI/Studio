@@ -232,6 +232,8 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
 
                 // Execute any tool calls
                 if (result.toolCalls && result.toolCalls.length > 0) {
+                    let successfulWrites = 0;
+
                     for (const toolCall of result.toolCalls) {
                         console.log(`[${this.name}] 🔧 Executing tool: ${toolCall.name}`);
 
@@ -243,6 +245,11 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
                                 result: toolResult,
                                 step
                             });
+
+                            // Track successful writes
+                            if (toolCall.name === 'write_file' && toolResult.includes('Successfully wrote')) {
+                                successfulWrites++;
+                            }
 
                             // Emit to bus
                             eventBus.emit('bus_message', {
@@ -260,7 +267,27 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
                         }
                     }
 
-                    // Continue loop to process tool results
+                    // AUTO-COMPLETE: If we successfully wrote files in step 1 and this was the only instruction,
+                    // consider the task done to avoid redundant tool calls
+                    if (successfulWrites > 0 && step === 1) {
+                        const summary = allToolResults.map(tr => `${tr.tool}: ${tr.result}`).join('; ');
+                        finalResponse = `Task completed. ${summary}`;
+
+                        eventBus.emit('bus_message', {
+                            type: 'TASK_COMPLETE',
+                            agentId: this.agentId,
+                            result: finalResponse,
+                            timestamp: new Date().toISOString()
+                        });
+
+                        console.log(`[${this.name}] 🔧 Auto-completing after successful file write`);
+                        break;
+                    }
+
+                    // Prompt the agent to confirm completion or continue
+                    conversationHistory += `\n\nTools executed successfully. If the original task is now complete, respond with [[COMPLETE: summary of what you did]]. If you need to do more work, continue with the next step.`;
+
+                    // Continue loop to let agent respond
                     continue;
                 }
 

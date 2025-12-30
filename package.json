@@ -4,11 +4,12 @@
     "description": "DeepFish Virtual Office - AI Agent System",
     "main": "src/index.js",
     "bin": {
-        "deepfish": "./src/cli.js"
+        "deepfish": "./bin/deepfish.js"
     },
     "scripts": {
         "start": "node src/server.js",
-        "cli": "node src/cli.js",
+        "cli": "node bin/deepfish.js",
+        "agent": "node bin/deepfish.js",
         "server": "node src/server.js",
         "dev": "node src/cli.js --dev",
         "build": "cd frontend && npm install && npm run build",

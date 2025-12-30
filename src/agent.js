@@ -10,6 +10,10 @@ import { chat, chatWithTools, isLlmAvailable } from './llm.js';
 import { getFactsForPrompt } from './memory.js';
 import { eventBus } from './bus.js'; // <-- WIRED to the nervous system
 import { getAnthropicToolSchemas, executeTool } from './tools/registry.js';
+import {
+    AgentMemory, ActionStep, PlanningStep, TaskStep,
+    FinalAnswerStep, TokenUsage, Timing
+} from './memory-steps.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,6 +30,7 @@ export class Agent {
         this.title = 'Agent';
         this.systemPrompt = '';
         this.llmAvailable = isLlmAvailable();
+        this.memory = null; // Initialized on first process
     }
 
     /**
@@ -144,12 +149,13 @@ export class Agent {
      * 
      * @param {string} input - User input/task
      * @param {object} options - Processing options
-     * @returns {object} { response, toolResults, stepsUsed }
+     * @returns {object} { response, toolResults, stepsUsed, memory }
      */
     async processWithTools(input, options = {}) {
         const {
             maxSteps = 5,
-            forceToolUse = false  // If true, agent MUST call a tool
+            forceToolUse = false,  // If true, agent MUST call a tool
+            planningInterval = 0   // Re-plan every N steps (0 = no re-planning)
         } = options;
 
         // Hydrate profile
@@ -201,6 +207,10 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
         const modelConfig = models?.best || models?.better || models?.good ||
             { provider: 'anthropic', name: 'claude-sonnet-4-20250514' };
 
+        // Initialize memory for this execution
+        this.memory = new AgentMemory(systemPrompt);
+        this.memory.addStep(new TaskStep(input));
+
         // ReAct Loop
         let step = 0;
         let conversationHistory = input;
@@ -210,6 +220,9 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
         while (step < maxSteps) {
             step++;
             console.log(`[${this.name}] 🔧 Step ${step}/${maxSteps}`);
+
+            // Create action step for memory
+            const actionStep = new ActionStep(step, { timing: new Timing() });
 
             try {
                 // Call LLM with tools
@@ -228,6 +241,7 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
                 // Store text response
                 if (result.text) {
                     finalResponse = result.text;
+                    actionStep.modelOutputMessage = result.text;
                 }
 
                 // Execute any tool calls
@@ -236,6 +250,7 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
 
                     for (const toolCall of result.toolCalls) {
                         console.log(`[${this.name}] 🔧 Executing tool: ${toolCall.name}`);
+                        actionStep.addToolCall(toolCall.name, toolCall.input, toolCall.id);
 
                         try {
                             const toolResult = await executeTool(toolCall.name, toolCall.input);
@@ -245,6 +260,8 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
                                 result: toolResult,
                                 step
                             });
+
+                            actionStep.addToolResult(toolCall.id, toolResult);
 
                             // Track successful writes
                             if (toolCall.name === 'write_file' && toolResult.includes('Successfully wrote')) {
@@ -264,8 +281,12 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
                         } catch (toolErr) {
                             console.error(`[${this.name}] 🔧 Tool ${toolCall.name} failed:`, toolErr.message);
                             conversationHistory += `\n\n[Tool Error for ${toolCall.name}]: ${toolErr.message}`;
+                            actionStep.error = toolErr;
                         }
                     }
+
+                    actionStep.complete();
+                    this.memory.addStep(actionStep);
 
                     // AUTO-COMPLETE: If we successfully wrote files in step 1 and this was the only instruction,
                     // consider the task done to avoid redundant tool calls
@@ -291,9 +312,13 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
                     continue;
                 }
 
+                actionStep.complete();
+                this.memory.addStep(actionStep);
+
                 // Check for completion/blocker tags
                 if (result.text?.includes('[[COMPLETE:')) {
                     const match = result.text.match(/\[\[COMPLETE:\s*(.+?)\]\]/is);
+                    actionStep.isFinalAnswer = true;
                     eventBus.emit('bus_message', {
                         type: 'TASK_COMPLETE',
                         agentId: this.agentId,
@@ -322,17 +347,24 @@ If you are blocked, respond with: [[BLOCKER: reason]]`;
 
             } catch (err) {
                 console.error(`[${this.name}] 🔧 Step ${step} failed:`, err.message);
+                actionStep.error = err;
+                actionStep.complete();
+                this.memory.addStep(actionStep);
                 finalResponse = `Error in step ${step}: ${err.message}`;
                 break;
             }
         }
+
+        // Add final answer to memory
+        this.memory.addStep(new FinalAnswerStep(finalResponse));
 
         console.log(`[${this.name}] 🔧 Completed. Steps: ${step}, Tools executed: ${allToolResults.length}`);
 
         return {
             response: finalResponse,
             toolResults: allToolResults,
-            stepsUsed: step
+            stepsUsed: step,
+            memory: this.memory  // Include memory in result
         };
     }
 

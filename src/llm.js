@@ -105,6 +105,198 @@ function isProviderAvailable(provider) {
     return !!getApiKey(provider) || isProviderEnabled(provider);
 }
 
+// ============================================
+// NATIVE TOOL CALLING - NEW IMPLEMENTATION
+// ============================================
+
+/**
+ * Chat with tools - Uses native LLM tool calling APIs
+ * This is the key to reliable agent work production!
+ * 
+ * @param {string} systemPrompt - System context
+ * @param {string} userMessage - User message
+ * @param {Array} tools - Tool schemas in provider format
+ * @param {object} options - Additional options
+ * @returns {object} { text, toolCalls, stopReason }
+ */
+export async function chatWithTools(systemPrompt, userMessage, tools = [], options = {}) {
+    const {
+        model = 'claude-sonnet-4-20250514',
+        maxTokens = 4096,
+        provider = 'anthropic',
+        toolChoice = 'auto',  // 'auto', 'any', 'none', or { type: 'tool', name: 'specific_tool' }
+        skipConstitution = false
+    } = options;
+
+    const effectivePrompt = skipConstitution ? systemPrompt : applyConstitution(systemPrompt);
+    const providers = [provider, 'anthropic', 'gemini'];
+
+    console.log(`[LLM] 🔧 Starting chatWithTools. Tools: [${tools.map(t => t.name).join(', ')}]`);
+
+    for (const p of providers) {
+        if (!isProviderAvailable(p)) continue;
+
+        try {
+            console.log(`[LLM] 🔧 Attempting tool call with provider: ${p}`);
+
+            if (p === 'anthropic') {
+                return await chatAnthropicWithTools(effectivePrompt, userMessage, tools, { model, maxTokens, toolChoice });
+            } else if (p === 'gemini' || p === 'google') {
+                return await chatGeminiWithTools(effectivePrompt, userMessage, tools, { model, maxTokens });
+            }
+        } catch (err) {
+            console.error(`[LLM] 🔧 ${p} tools failed:`, err.message);
+            continue;
+        }
+    }
+
+    throw new Error('No LLM provider available for tool calling');
+}
+
+/**
+ * Anthropic Claude with native tool calling
+ */
+async function chatAnthropicWithTools(systemPrompt, userMessage, tools, options) {
+    const client = getAnthropicClient();
+
+    let model = options.model;
+    if (!model || !model.startsWith('claude')) {
+        model = 'claude-sonnet-4-20250514';
+    }
+
+    // Convert toolChoice to Anthropic format
+    let tool_choice;
+    if (options.toolChoice === 'auto') {
+        tool_choice = { type: 'auto' };
+    } else if (options.toolChoice === 'any') {
+        tool_choice = { type: 'any' };  // Force tool use
+    } else if (options.toolChoice === 'none') {
+        tool_choice = { type: 'none' };
+    } else if (typeof options.toolChoice === 'object' && options.toolChoice.name) {
+        tool_choice = { type: 'tool', name: options.toolChoice.name };
+    } else {
+        tool_choice = { type: 'auto' };
+    }
+
+    const requestBody = {
+        model,
+        max_tokens: options.maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }]
+    };
+
+    // Only add tools if we have them
+    if (tools && tools.length > 0) {
+        requestBody.tools = tools;
+        requestBody.tool_choice = tool_choice;
+    }
+
+    console.log(`[LLM:Anthropic] 🔧 Calling with ${tools?.length || 0} tools, tool_choice=${JSON.stringify(tool_choice)}`);
+
+    try {
+        const response = await client.messages.create(requestBody);
+
+        // Parse response
+        const textBlocks = response.content.filter(b => b.type === 'text');
+        const toolBlocks = response.content.filter(b => b.type === 'tool_use');
+
+        const result = {
+            text: textBlocks.map(b => b.text).join('\n'),
+            toolCalls: toolBlocks.map(b => ({
+                id: b.id,
+                name: b.name,
+                input: b.input
+            })),
+            stopReason: response.stop_reason  // 'end_turn', 'tool_use', 'max_tokens'
+        };
+
+        console.log(`[LLM:Anthropic] 🔧 Response: stopReason=${result.stopReason}, toolCalls=${result.toolCalls.length}`);
+        if (result.toolCalls.length > 0) {
+            console.log(`[LLM:Anthropic] 🔧 Tools called: ${result.toolCalls.map(t => t.name).join(', ')}`);
+        }
+
+        return result;
+    } catch (err) {
+        console.error('[LLM:Anthropic] 🔧 Error:', err.message);
+        throw err;
+    }
+}
+
+/**
+ * Google Gemini with function calling
+ */
+async function chatGeminiWithTools(systemPrompt, userMessage, tools, options) {
+    const apiKey = getApiKey('gemini');
+    if (!apiKey) throw new Error('Gemini API key not configured');
+
+    let model = options.model;
+    if (!model || !model.startsWith('gemini')) {
+        model = 'gemini-2.0-flash';
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const requestBody = {
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userMessage }] }],
+        generationConfig: {
+            maxOutputTokens: options.maxTokens,
+            temperature: 0.7
+        }
+    };
+
+    // Add tools if present
+    if (tools && tools.length > 0) {
+        // Convert from Anthropic format to Gemini format if needed
+        const geminiTools = tools[0].function_declarations ? tools : [{
+            function_declarations: tools.map(t => ({
+                name: t.name,
+                description: t.description,
+                parameters: t.input_schema || t.parameters
+            }))
+        }];
+        requestBody.tools = geminiTools;
+    }
+
+    console.log(`[LLM:Gemini] 🔧 Calling with ${tools?.length || 0} tools`);
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Gemini API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const candidate = data.candidates?.[0];
+        const content = candidate?.content;
+
+        // Parse response parts
+        const textParts = content?.parts?.filter(p => p.text) || [];
+        const functionCalls = content?.parts?.filter(p => p.functionCall) || [];
+
+        const result = {
+            text: textParts.map(p => p.text).join('\n'),
+            toolCalls: functionCalls.map(p => ({
+                id: `gemini_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                name: p.functionCall.name,
+                input: p.functionCall.args
+            })),
+            stopReason: candidate?.finishReason || 'STOP'
+        };
+
+        console.log(`[LLM:Gemini] 🔧 Response: stopReason=${result.stopReason}, toolCalls=${result.toolCalls.length}`);
+        return result;
+    } catch (err) {
+        console.error('[LLM:Gemini] 🔧 Error:', err.message);
+        throw err;
+    }
+}
+
 /**
  * Chat with a specific provider
  */

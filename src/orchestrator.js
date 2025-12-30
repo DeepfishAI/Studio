@@ -348,6 +348,7 @@ class Orchestrator {
 
     /**
      * Run the Agent Logic (LLM Process)
+     * NOW USES NATIVE TOOL CALLING when agent has tools enabled
      */
     async runAgentExecution(agentId, taskId, instructions) {
         // 1. Get Agent Profile
@@ -356,8 +357,12 @@ class Orchestrator {
             throw new Error(`Agent ${agentId} not found`);
         }
 
+        // Hydrate the agent to access profile
+        await agent.hydrate();
+
         // --- BRIDGE: SAFETY CHECK (INPUT) ---
-        if (agent.safety?.enabled) {
+        const agentProfile = agent.profile?.agent;
+        if (agentProfile?.safety?.enabled) {
             const isSafe = await this.checkSafety(instructions, 'input');
             if (!isSafe) {
                 console.warn(`[Orchestrator] 🛡️ Safety Block (Input): ${agentId}`);
@@ -368,19 +373,17 @@ class Orchestrator {
 
         // --- BRIDGE: RAG KNOWLEDGE FETCH ---
         let knowledgeContext = "";
-        if (agent.knowledge?.enabled) {
+        if (agentProfile?.knowledge?.enabled) {
             console.log(`[Orchestrator] 🧠 Fetching knowledge for ${agentId}...`);
-            const collections = agent.knowledge.collections || ['default'];
-            // Simple strategy: use full instructions as query
+            const collections = agentProfile.knowledge.collections || ['default'];
             const contextChunk = await this.fetchKnowledge(instructions, collections[0]);
             if (contextChunk) {
                 knowledgeContext = `\nRELEVANT KNOWLEDGE:\n"${contextChunk}"\n`;
-                // VISUALIZATION: Tell the bus we found knowledge
                 await BusOps.KNOWLEDGE(agentId, taskId, contextChunk.substring(0, 80) + "...");
             }
         }
 
-        // 2. Build Context (include task context for agent)
+        // 2. Build Context
         const fullContext = `TASK ID: ${taskId}
 INSTRUCTIONS: ${instructions}
 ${knowledgeContext}
@@ -389,13 +392,51 @@ If you need to create files, USE the write_file tool.
 If you are done, end with [[COMPLETE: summary]].
 If blocked, end with [[BLOCKER: reason]].`;
 
-        // 3. Think (Use agent.process() to include tools + action mode)
-        // This ensures tool instructions are in the prompt and [[TOOL:...]] is parsed
-        console.log(`[Orchestrator] ${agentId} is thinking (with tools enabled)...`);
-        const response = await agent.process(fullContext);
+        // 3. CHECK: Does this agent have tools?
+        const agentTools = agentProfile?.tools;
+        const hasTools = agentTools?.fileSystem || agentTools?.codeExecution || agentTools?.imageGeneration;
+
+        let response;
+        let toolResults = [];
+
+        if (hasTools) {
+            // ============================================
+            // NEW PATH: Native Tool Calling + ReAct Loop
+            // ============================================
+            console.log(`[Orchestrator] 🔧 ${agentId} has tools - using processWithTools()`);
+
+            try {
+                const result = await agent.processWithTools(fullContext, {
+                    maxSteps: 5,
+                    forceToolUse: false
+                });
+
+                response = result.response;
+                toolResults = result.toolResults;
+
+                console.log(`[Orchestrator] 🔧 ${agentId} completed. Tools executed: ${toolResults.length}`);
+
+                // Log tool results for debugging
+                if (toolResults.length > 0) {
+                    console.log(`[Orchestrator] 🔧 Tool results:`);
+                    toolResults.forEach((tr, i) => {
+                        console.log(`  ${i + 1}. ${tr.tool}: ${tr.result?.substring(0, 100)}...`);
+                    });
+                }
+            } catch (err) {
+                console.error(`[Orchestrator] 🔧 processWithTools failed:`, err.message);
+                response = `Error during tool execution: ${err.message}`;
+            }
+        } else {
+            // ============================================
+            // LEGACY PATH: Regular process() for non-tool agents
+            // ============================================
+            console.log(`[Orchestrator] ${agentId} is thinking (legacy mode)...`);
+            response = await agent.process(fullContext);
+        }
 
         // --- BRIDGE: SAFETY CHECK (OUTPUT) ---
-        if (agent.safety?.enabled) {
+        if (agentProfile?.safety?.enabled) {
             const isSafe = await this.checkSafety(response, 'output');
             if (!isSafe) {
                 console.warn(`[Orchestrator] 🛡️ Safety Block (Output): ${agentId}`);
@@ -404,15 +445,18 @@ If blocked, end with [[BLOCKER: reason]].`;
             }
         }
 
-        // 4. Act (Parse Response for bus operations)
-        // Note: [[TOOL:...]] is already handled by agent.process()
-        // We just need to handle bus-specific commands
+        // 4. Handle Response (Bus Operations)
+        // Include tool results in the deliverable
+        let deliverable = response;
+        if (toolResults.length > 0) {
+            const toolSummary = toolResults.map(tr => `- ${tr.tool}: ${tr.result}`).join('\n');
+            deliverable = `${response}\n\n**Tools Executed:**\n${toolSummary}`;
+        }
 
         // Check for COMPLETE
         if (response.includes('[[COMPLETE:')) {
             const match = response.match(/\[\[COMPLETE:\s*(.+?)\]\]/is);
-            const deliverable = match ? match[1] : response;
-            await BusOps.COMPLETE(agentId, taskId, deliverable);
+            await BusOps.COMPLETE(agentId, taskId, match ? match[1] : deliverable);
         }
         // Check for QUERY
         else if (response.includes('[[QUERY:')) {
@@ -420,21 +464,18 @@ If blocked, end with [[BLOCKER: reason]].`;
             if (match) {
                 await BusOps.QUERY(agentId, taskId, match[2], [match[1]]);
             } else {
-                // Fallback: just post message
                 await BusOps.ASSERT(agentId, taskId, response);
             }
         }
         // Check for BLOCKER
         else if (response.includes('[[BLOCKER:')) {
             const match = response.match(/\[\[BLOCKER:\s*(.+?)\]\]/is);
-            const reason = match ? match[1] : 'Unknown blocker';
-            await BusOps.BLOCKER(agentId, taskId, reason);
+            await BusOps.BLOCKER(agentId, taskId, match ? match[1] : 'Unknown blocker');
         }
-        // Metadata / Status Update / Partial Work
+        // No tags - auto-complete with deliverable
         else {
-            await BusOps.ASSERT(agentId, taskId, response);
-            // Auto-complete for now if simple response to avoid hanging tasks
-            await BusOps.COMPLETE(agentId, taskId, response);
+            await BusOps.ASSERT(agentId, taskId, deliverable);
+            await BusOps.COMPLETE(agentId, taskId, deliverable);
         }
     }
 

@@ -6,9 +6,10 @@
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { chat, isLlmAvailable } from './llm.js';
+import { chat, chatWithTools, isLlmAvailable } from './llm.js';
 import { getFactsForPrompt } from './memory.js';
 import { eventBus } from './bus.js'; // <-- WIRED to the nervous system
+import { getAnthropicToolSchemas, executeTool } from './tools/registry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -133,8 +134,183 @@ export class Agent {
         return `[System Error]: I am currently unable to think. All my model circuits (${executionPlan.map(p => p.tier).join(', ')}) are offline or errored.\nLast error: ${lastError?.message}`;
     }
 
+    // ============================================
+    // NEW: NATIVE TOOL CALLING WITH REACT LOOP
+    // ============================================
+
     /**
-     * Parse response for tools, completion, or blockers
+     * Process with native tool calling and ReAct loop
+     * This is the NEW way to run agents that actually produce work!
+     * 
+     * @param {string} input - User input/task
+     * @param {object} options - Processing options
+     * @returns {object} { response, toolResults, stepsUsed }
+     */
+    async processWithTools(input, options = {}) {
+        const {
+            maxSteps = 5,
+            forceToolUse = false  // If true, agent MUST call a tool
+        } = options;
+
+        // Hydrate profile
+        await this.hydrate();
+
+        if (!isLlmAvailable()) {
+            throw new Error(`No LLM provider available for ${this.name}`);
+        }
+
+        // Check if this agent has tools enabled
+        const agentTools = this.profile.agent?.tools;
+        const hasTools = agentTools?.fileSystem || agentTools?.codeExecution || agentTools?.imageGeneration;
+
+        if (!hasTools) {
+            console.log(`[${this.name}] 🔧 No tools enabled, falling back to regular process()`);
+            return { response: await this.process(input), toolResults: [], stepsUsed: 1 };
+        }
+
+        // Get tool schemas for the LLM
+        const toolSchemas = getAnthropicToolSchemas();
+
+        // Filter to only tools this agent can use
+        const allowedTools = [];
+        if (agentTools.fileSystem || agentTools.codeExecution) {
+            allowedTools.push('write_file', 'read_file', 'list_files');
+        }
+        if (agentTools.imageGeneration) {
+            allowedTools.push('generate_image');
+        }
+        const filteredSchemas = toolSchemas.filter(t => allowedTools.includes(t.name));
+
+        console.log(`[${this.name}] 🔧 Starting processWithTools. Available tools: [${filteredSchemas.map(t => t.name).join(', ')}]`);
+
+        // Build system prompt
+        const factsSection = await getFactsForPrompt(this.agentId, input);
+        const systemPrompt = this.systemPrompt + factsSection + `
+
+## TOOL USAGE
+You have access to real tools that create real files. When asked to create code, apps, or files:
+1. ALWAYS use the tools provided
+2. Do NOT just describe what you would create - actually CREATE it
+3. After using a tool, confirm what you did
+
+When your task is complete, respond with: [[COMPLETE: summary of what you did]]
+If you are blocked, respond with: [[BLOCKER: reason]]`;
+
+        // Build model config from profile
+        const models = this.profile.agent?.models;
+        const modelConfig = models?.best || models?.better || models?.good ||
+            { provider: 'anthropic', name: 'claude-sonnet-4-20250514' };
+
+        // ReAct Loop
+        let step = 0;
+        let conversationHistory = input;
+        const allToolResults = [];
+        let finalResponse = '';
+
+        while (step < maxSteps) {
+            step++;
+            console.log(`[${this.name}] 🔧 Step ${step}/${maxSteps}`);
+
+            try {
+                // Call LLM with tools
+                const result = await chatWithTools(
+                    systemPrompt,
+                    conversationHistory,
+                    filteredSchemas,
+                    {
+                        provider: modelConfig.provider,
+                        model: modelConfig.name,
+                        maxTokens: modelConfig.maxTokens || 4096,
+                        toolChoice: forceToolUse && step === 1 ? 'any' : 'auto'
+                    }
+                );
+
+                // Store text response
+                if (result.text) {
+                    finalResponse = result.text;
+                }
+
+                // Execute any tool calls
+                if (result.toolCalls && result.toolCalls.length > 0) {
+                    for (const toolCall of result.toolCalls) {
+                        console.log(`[${this.name}] 🔧 Executing tool: ${toolCall.name}`);
+
+                        try {
+                            const toolResult = await executeTool(toolCall.name, toolCall.input);
+                            allToolResults.push({
+                                tool: toolCall.name,
+                                input: toolCall.input,
+                                result: toolResult,
+                                step
+                            });
+
+                            // Emit to bus
+                            eventBus.emit('bus_message', {
+                                type: 'TOOL_RESULT',
+                                agentId: this.agentId,
+                                content: `Executed ${toolCall.name}: ${toolResult}`,
+                                timestamp: new Date().toISOString()
+                            });
+
+                            // Add result to conversation for next iteration
+                            conversationHistory += `\n\n[Tool Result for ${toolCall.name}]: ${toolResult}`;
+                        } catch (toolErr) {
+                            console.error(`[${this.name}] 🔧 Tool ${toolCall.name} failed:`, toolErr.message);
+                            conversationHistory += `\n\n[Tool Error for ${toolCall.name}]: ${toolErr.message}`;
+                        }
+                    }
+
+                    // Continue loop to process tool results
+                    continue;
+                }
+
+                // Check for completion/blocker tags
+                if (result.text?.includes('[[COMPLETE:')) {
+                    const match = result.text.match(/\[\[COMPLETE:\s*(.+?)\]\]/is);
+                    eventBus.emit('bus_message', {
+                        type: 'TASK_COMPLETE',
+                        agentId: this.agentId,
+                        result: match?.[1]?.trim() || result.text,
+                        timestamp: new Date().toISOString()
+                    });
+                    break;
+                }
+
+                if (result.text?.includes('[[BLOCKER:')) {
+                    const match = result.text.match(/\[\[BLOCKER:\s*(.+?)\]\]/is);
+                    eventBus.emit('bus_message', {
+                        type: 'BLOCKER',
+                        agentId: this.agentId,
+                        reason: match?.[1]?.trim() || 'Unknown blocker',
+                        timestamp: new Date().toISOString()
+                    });
+                    break;
+                }
+
+                // If no tool calls and end_turn, we're done
+                if (result.stopReason === 'end_turn') {
+                    console.log(`[${this.name}] 🔧 Agent finished (end_turn)`);
+                    break;
+                }
+
+            } catch (err) {
+                console.error(`[${this.name}] 🔧 Step ${step} failed:`, err.message);
+                finalResponse = `Error in step ${step}: ${err.message}`;
+                break;
+            }
+        }
+
+        console.log(`[${this.name}] 🔧 Completed. Steps: ${step}, Tools executed: ${allToolResults.length}`);
+
+        return {
+            response: finalResponse,
+            toolResults: allToolResults,
+            stepsUsed: step
+        };
+    }
+
+    /**
+     * Parse response for tools, completion, or blockers (LEGACY)
      */
     async handleResponseTags(response) {
         const completeMatch = response.match(/\[\[COMPLETE:\s*(.+?)\]\]/i);

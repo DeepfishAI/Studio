@@ -1,4 +1,5 @@
-{  "$schema": "./agent.schema.json",
+{
+  "$schema": "./agent.schema.json",
   "schemaVersion": "2.0",
   "identity": {
     "id": "sally",
@@ -106,3 +107,4 @@
       "backup": "google:gemini-2.0-pro"
     }
   }
+}

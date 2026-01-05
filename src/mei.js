@@ -78,10 +78,19 @@ function buildSystemPrompt(profile) {
     const title = agent.identity?.title || 'Project Manager';
     const tagline = agent.identity?.tagline || '';
 
-    const backstory = personality.backstory?.philosophy || '';
-    const style = personality.traits?.communication?.style || '';
-    const voice = personality.traits?.communication?.voice || '';
-    const tone = personality.traits?.communication?.tone || '';
+    // Use correct JSON structure
+    const backstoryPhilosophy = personality.backstory?.philosophy || '';
+    const backstoryOrigin = personality.backstory?.origin || '';
+    const backstoryReputation = personality.backstory?.reputation || '';
+
+    const style = personality.personality?.style || '';
+    const voice = personality.personality?.voice || '';
+    const tone = personality.personality?.tone || '';
+    const quirks = personality.personality?.quirks || [];
+    const core = personality.personality?.core || [];
+
+    const mentalFocus = personality.think?.mentalFocus || [];
+    const priorities = personality.think?.priorities || [];
 
     const primeAlways = personality.primeDirective?.always || [];
     const primeNever = personality.primeDirective?.never || [];
@@ -94,26 +103,53 @@ function buildSystemPrompt(profile) {
         prompt += ` You are "${tagline}".`;
     }
 
-    prompt += `\n\nYour personality:\n`;
-    if (style) prompt += `- ${style}\n`;
-    if (voice) prompt += `- ${voice}\n`;
-    if (tone) prompt += `- Tone: ${tone}\n`;
+    // Add origin story for depth
+    if (backstoryOrigin) {
+        prompt += `\n\nBACKSTORY: ${backstoryOrigin}`;
+    }
 
-    if (backstory) {
-        prompt += `\nPhilosophy: ${backstory}\n`;
+    // Add reputation
+    if (backstoryReputation) {
+        prompt += `\n\nREPUTATION: ${backstoryReputation}`;
+    }
+
+    // Add philosophy
+    if (backstoryPhilosophy) {
+        prompt += `\n\nPHILOSOPHY: ${backstoryPhilosophy}`;
+    }
+
+    // Add personality traits
+    prompt += `\n\nPERSONALITY:`;
+    if (core.length > 0) {
+        prompt += `\nCore traits: ${core.join(', ')}`;
+    }
+    if (style) prompt += `\nStyle: ${style}`;
+    if (voice) prompt += `\nVoice: ${voice}`;
+    if (tone) prompt += `\nTone: ${tone}`;
+
+    if (quirks.length > 0) {
+        prompt += `\nQuirks:\n`;
+        quirks.forEach(q => prompt += `- ${q}\n`);
+    }
+
+    // Add mental focus
+    if (mentalFocus.length > 0) {
+        prompt += `\nMENTAL FOCUS (how you think):\n`;
+        mentalFocus.forEach(f => prompt += `- ${f}\n`);
     }
 
     if (expertise) {
-        prompt += `\nExpertise: ${expertise}\n`;
+        prompt += `\nEXPERTISE: ${expertise}`;
     }
 
+    // CRITICAL: Prime directives define behavior
     if (primeAlways.length > 0) {
-        prompt += `\nAlways:\n`;
+        prompt += `\n\nALWAYS:\n`;
         primeAlways.forEach(p => prompt += `- ${p}\n`);
     }
 
     if (primeNever.length > 0) {
-        prompt += `\nNever:\n`;
+        prompt += `\nNEVER:\n`;
         primeNever.forEach(p => prompt += `- ${p}\n`);
     }
 
@@ -148,7 +184,7 @@ export class Mei {
      * If it does not exist, Mei will refuse to route tasks.
      */
     ensureKnowledgeMap() {
-        try { mkdirSync(ORACLE_RECEIPTS_DIR, { recursive: true }); } catch {}
+        try { mkdirSync(ORACLE_RECEIPTS_DIR, { recursive: true }); } catch { }
 
         if (existsSync(MEI_KNOWLEDGE_MAP_PATH)) return;
 
@@ -224,7 +260,7 @@ export class Mei {
     }
 
     logDecision(decisionObj) {
-        try { mkdirSync(ORACLE_RECEIPTS_DIR, { recursive: true }); } catch {}
+        try { mkdirSync(ORACLE_RECEIPTS_DIR, { recursive: true }); } catch { }
         try {
             appendFileSync(MEI_DECISIONS_LOG_PATH, JSON.stringify(decisionObj) + "\n", 'utf-8');
         } catch (e) {

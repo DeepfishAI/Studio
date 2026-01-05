@@ -16,10 +16,7 @@ import CheckoutCanceledPage from './pages/CheckoutCanceledPage'
 import WorkspacePage from './pages/WorkspacePage'
 import TogglesPage from './pages/TogglesPage'
 import StorePage from './pages/StorePage'
-<<<<<<< HEAD
 import GodModePage from './pages/GodModePage'
-=======
->>>>>>> origin/main
 import AdminPage from './pages/AdminPage'
 
 function ProtectedRoute({ children }) {
@@ -93,10 +90,7 @@ function AppRoutes() {
                 <Route path="workspace" element={<WorkspacePage />} />
                 <Route path="toggles" element={<TogglesPage />} />
                 <Route path="store" element={<StorePage />} />
-<<<<<<< HEAD
                 <Route path="god" element={<GodModePage />} />
-=======
->>>>>>> origin/main
             </Route>
 
             {/* Billing result pages (outside Layout for cleaner UX) */}

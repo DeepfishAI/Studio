@@ -22,15 +22,19 @@ export default function ScrollingCodeBackground() {
     const [lines, setLines] = useState([]);
 
     useEffect(() => {
-        // Generate 9 random code lines with varied speeds for 3D effect (50% denser)
+        // Generate 9 random code lines with varied speeds for starfield effect
         const colors = ['#1E90FF', '#9B59B6', '#2ECC71', '#FF9F43', '#E74C99', '#00D4FF'];
-        const newLines = Array.from({ length: 9 }, (_, i) => ({
-            id: i,
-            code: codeSnippets[Math.floor(Math.random() * codeSnippets.length)],
-            color: colors[i % colors.length],
-            duration: 30 + i * 7, // More varied speeds: 30s, 37s, 44s... 86s (3D effect)
-            delay: i * -8 // Stagger start positions
-        }));
+        const newLines = Array.from({ length: 9 }, (_, i) => {
+            const code = codeSnippets[Math.floor(Math.random() * codeSnippets.length)];
+            return {
+                id: i,
+                // Duplicate code for seamless looping
+                code: `${code}     ${code}     ${code}`,
+                color: colors[i % colors.length],
+                duration: 15 + i * 8, // Speeds from 15s to 79s (2x variation)
+                delay: 0 // Start immediately, no gaps
+            };
+        });
         setLines(newLines);
     }, []);
 

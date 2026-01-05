@@ -1,0 +1,36 @@
+{
+    "$comment": "=== NeMo TOOLKIT MODULE — Agent Profiling & debugging ===",
+    "$description": "Provides deep introspection into agent performance, latency, and costs",
+    "$why_needed": [
+        "Optimize agent prompt chains",
+        "Debug latency bottlenecks",
+        "Track token usage and costs per task",
+        "Oracle needs visibility to give advice"
+    ],
+    "module_id": "nemo_toolkit",
+    "type": "infrastructure",
+    "cost": "PLATINUM",
+    "available_tiers": [
+        "platinum"
+    ],
+    "config": {
+        "profiler": {
+            "enabled": true,
+            "sample_rate": 1.0,
+            "capture_input": true,
+            "capture_output": true
+        },
+        "metrics": [
+            "latency_ms",
+            "tokens_input",
+            "tokens_output",
+            "tool_calls",
+            "cost_usd"
+        ],
+        "dashboard": {
+            "enabled": true,
+            "port": 3001
+        },
+        "trace_storage": "redis"
+    }
+}

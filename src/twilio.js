@@ -1,0 +1,584 @@
+/**
+ * Twilio Voice Module with ElevenLabs Integration
+ * Handles incoming phone calls to DeepFish
+ * Vesper answers and routes callers to their chosen agent
+ * Uses ElevenLabs for premium TTS voices
+ */
+
+import twilio from 'twilio';
+import { getAgent } from './agent.js';
+import { isLlmAvailable } from './llm.js';
+import { Vesper } from './vesper.js';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
+import { eventBus } from './bus.js';
+import { loadConfig } from './config.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const ROOT = join(__dirname, '..');
+
+const { VoiceResponse } = twilio.twiml;
+
+// Initialize Vesper for routing logic
+const vesper = new Vesper();
+
+// Get Twilio config from unified config loader
+function getTwilioConfig() {
+    const cfg = loadConfig();
+    return {
+        accountSid: cfg.twilio?.account_sid || process.env.TWILIO_ACCOUNT_SID || '',
+        authToken: cfg.twilio?.auth_token || process.env.TWILIO_AUTH_TOKEN || '',
+        phoneNumber: cfg.twilio?.phone_number || process.env.TWILIO_PHONE_NUMBER || ''
+    };
+}
+
+// Get ElevenLabs config from unified config loader
+function getElevenLabsConfig() {
+    const cfg = loadConfig();
+    return {
+        apiKey: cfg.elevenlabs?.api_key || process.env.ELEVENLABS_API_KEY || ''
+    };
+}
+
+// Lazy-loaded credentials (cached after first access)
+let _twilioConfig = null;
+let _elevenLabsConfig = null;
+
+function getTwilioCredentials() {
+    if (!_twilioConfig) _twilioConfig = getTwilioConfig();
+    return _twilioConfig;
+}
+
+function getElevenLabsCredentials() {
+    if (!_elevenLabsConfig) _elevenLabsConfig = getElevenLabsConfig();
+    return _elevenLabsConfig;
+}
+
+export function isTwilioEnabled() {
+    const { accountSid, authToken } = getTwilioCredentials();
+    return !!(accountSid && authToken);
+}
+
+export function isElevenLabsEnabled() {
+    const { apiKey } = getElevenLabsCredentials();
+    return !!apiKey;
+}
+
+import { getVoiceId, AGENT_GREETINGS } from './fallbacks.js';
+
+// Legacy fallback (maintained for backward compatibility if needed, but primary use is fallbacks.js)
+const ELEVENLABS_VOICES = {
+    vesper: getVoiceId('vesper'),
+    mei: getVoiceId('mei'),
+    hanna: getVoiceId('hanna'),
+    it: getVoiceId('it'),
+    sally: getVoiceId('sally'),
+    oracle: getVoiceId('oracle')
+};
+
+const POLLY_VOICES = {
+    vesper: getVoiceId('vesper', true),
+    mei: getVoiceId('mei', true),
+    hanna: getVoiceId('hanna', true),
+    it: getVoiceId('it', true),
+    sally: getVoiceId('sally', true),
+    oracle: getVoiceId('oracle', true)
+};
+
+// In-memory request cache (audioId -> { text, voiceId, createdAt })
+const pendingAudio = new Map();
+
+/**
+ * Cleanup pending requests
+ */
+function cleanupPendingAudio() {
+    const now = Date.now();
+    for (const [id, data] of pendingAudio.entries()) {
+        if (now - data.createdAt > 300000) { // 5 minutes TTL
+            pendingAudio.delete(id);
+        }
+    }
+}
+setInterval(cleanupPendingAudio, 60000);
+
+/**
+ * Generate audio using ElevenLabs TTS (Streaming Mode)
+ * Returns audioId that will trigger the stream when accessed
+ */
+export async function generateElevenLabsAudio(text, agentId) {
+    // Load agent to get their voice ID
+    const agent = getAgent(agentId);
+
+    // 1. Check User Overlay (Priority)
+    let voiceId = agent?.profile?.user?.preferences?.voice?.voiceId;
+
+    // 2. Check Agent Default
+    if (!voiceId) {
+        voiceId = agent?.profile?.agent?.tools?.voiceSynthesis?.voiceId;
+    }
+
+    // Legacy fallback
+    if (!voiceId) {
+        voiceId = ELEVENLABS_VOICES[agentId] || ELEVENLABS_VOICES.vesper;
+    }
+
+    const { apiKey: elevenLabsApiKey } = getElevenLabsCredentials();
+    if (!elevenLabsApiKey) {
+        console.warn('[ElevenLabs] Missing API Key. Falling back.');
+        return null;
+    }
+
+    const audioId = uuidv4();
+
+    // Store parameters for the upcoming fetch
+    pendingAudio.set(audioId, {
+        text,
+        voiceId,
+        createdAt: Date.now()
+    });
+
+    console.log(`[ElevenLabs] Quotes audio ID: ${audioId} (Waiting for stream request)`);
+    return audioId;
+}
+
+/**
+ * Serve audio file for Twilio to play
+ * GET /api/voice/audio/:audioId
+ * ACTS AS A PROXY: Pipes ElevenLabs API response directly to Twilio
+ */
+export async function serveAudio(req, res) {
+    const { audioId } = req.params;
+
+    if (!pendingAudio.has(audioId)) {
+        return res.status(404).send('Audio expired or not found');
+    }
+
+    const { text, voiceId } = pendingAudio.get(audioId);
+    pendingAudio.delete(audioId); // Single use
+
+    console.log(`[ElevenLabs] Streaming starting for ${audioId}...`);
+    const startTime = Date.now();
+
+    try {
+        const { apiKey: elevenLabsKey } = getElevenLabsCredentials();
+        const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream?output_format=mp3_44100_128`, {
+            method: 'POST',
+            headers: {
+                'xi-api-key': elevenLabsKey,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: text,
+                model_id: 'eleven_turbo_v2_5',
+                voice_settings: {
+                    stability: 0.5,
+                    similarity_boost: 0.75
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.text();
+            console.error(`[ElevenLabs] Stream API Failed: ${response.status} - ${error}`);
+            return res.status(500).send('Upstream API Failed');
+        }
+
+        // Set headers for MP3 stream
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        // Pipe the body reader to the response
+        // Node 18+ fetch has .body as a ReadableStream (web standard), 
+        // effectively we need to convert or iterate. 
+        // But in Node environment with 'undici' (global fetch), response.body is iterable.
+
+        const reader = response.body.getReader();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            res.write(value);
+        }
+
+        res.end();
+        console.log(`[ElevenLabs] Stream finished for ${audioId} (Total: ${Date.now() - startTime}ms)`);
+
+    } catch (err) {
+        console.error(`[ElevenLabs] Proxy Error:`, err);
+        if (!res.headersSent) res.status(500).send('Proxy Error');
+    }
+}
+
+// Initialize Twilio client (for outbound if needed)
+let twilioClient = null;
+
+function getTwilioClient() {
+    if (!twilioClient) {
+        const { accountSid, authToken } = getTwilioCredentials();
+        if (accountSid && authToken) {
+            twilioClient = twilio(accountSid, authToken);
+        }
+    }
+    return twilioClient;
+}
+
+/**
+ * Send an SMS message
+ * @param {string} to - Phone number to send to
+ * @param {string} body - Message body
+ */
+export async function sendSms(to, body) {
+    const client = getTwilioClient();
+    const { phoneNumber } = getTwilioCredentials();
+
+    if (!client || !phoneNumber) {
+        console.warn('[Twilio] SMS skipped: Not configured');
+        return false;
+    }
+    const from = phoneNumber;
+
+    try {
+        const message = await client.messages.create({
+            body,
+            from,
+            to
+        });
+        console.log(`[Twilio] SMS sent to ${to}: ${message.sid}`);
+        return true;
+    } catch (err) {
+        console.error(`[Twilio] SMS failed: ${err.message}`);
+        return false;
+    }
+}
+
+
+/**
+ * Make an outbound call
+ * @param {string} to - Phone number to call
+ * @param {string} message - Text to say
+ */
+export async function makeCall(to, message) {
+    const client = getTwilioClient();
+    const from = process.env.TWILIO_PHONE_NUMBER;
+
+    if (!client || !from) return false;
+
+    try {
+        // TwiML for the call
+        const twiml = new VoiceResponse();
+        twiml.pause({ length: 1 });
+        twiml.say({ voice: 'Polly.Aditi' }, "Attention. This is a priority update from DeepFish.");
+        twiml.pause({ length: 1 });
+        twiml.say({ voice: 'Polly.Joanna' }, message);
+
+        await client.calls.create({
+            twiml: twiml.toString(),
+            to,
+            from
+        });
+        console.log(`[Twilio] Call initiated to ${to}`);
+        return true;
+    } catch (err) {
+        console.error(`[Twilio] Call failed: ${err.message}`);
+        return false;
+    }
+}
+
+/**
+ * Get base URL for audio serving
+ */
+function getBaseUrl(req) {
+    // Use X-Forwarded headers if behind proxy (Railway)
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    return `${proto}://${host}`;
+}
+
+/**
+ * Add speech to TwiML - uses ElevenLabs if available, Polly as fallback
+ */
+async function addSpeech(response, text, agentId, req) {
+    if (isElevenLabsEnabled()) {
+        try {
+            const audioId = await generateElevenLabsAudio(text, agentId);
+            const audioUrl = `${getBaseUrl(req)}/api/voice/audio/${audioId}`;
+            response.play(audioUrl);
+            return;
+        } catch (err) {
+            console.error(`[ElevenLabs] Error, falling back to Polly:`, err.message);
+        }
+    }
+
+    // Fallback to Polly
+    response.say({
+        voice: POLLY_VOICES[agentId] || 'Polly.Joanna'
+    }, text);
+}
+
+/**
+ * Handle incoming call - Vesper answers
+ * POST /api/voice/incoming
+ * 
+ * Supports two modes:
+ * - HTTP mode (default): Uses traditional TwiML with <Say>/<Play>
+ * - WebSocket mode: Uses <Connect><Stream> for real-time bidirectional audio
+ */
+export async function handleIncomingCall(req, res) {
+    const response = new VoiceResponse();
+
+    // Check if WebSocket mode is enabled (set USE_WEBSOCKET_VOICE=true)
+    // FORCE OFF - Railway env var may still be set incorrectly
+    const useWebSocket = false;
+
+    if (useWebSocket) {
+        // WebSocket Mode: Connect to Media Stream for real-time audio
+        console.log('[Twilio] Using WebSocket mode for incoming call');
+
+        // Get the base URL for WebSocket connection
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers.host;
+        const wsUrl = `wss://${host}/media-stream`;
+
+        // Use Connect/Stream to establish bidirectional WebSocket
+        const connect = response.connect();
+        connect.stream({
+            url: wsUrl,
+            name: 'DeepFish-MediaStream'
+        });
+
+        console.log(`[Twilio] Connecting Media Stream to: ${wsUrl}`);
+    } else {
+        // HTTP Mode: Traditional TwiML with ElevenLabs TTS
+        // Vesper's greeting - professional Hong Kong style
+        await addSpeech(response, 'DeepFish Hong Kong... How may I direct your call?', 'vesper', req);
+
+        // Gather speech input - wait for caller to say who they want
+        const gather = response.gather({
+            input: 'speech',
+            action: '/api/voice/route',
+            method: 'POST',
+            speechTimeout: 'auto',
+            language: 'en-US',
+            hints: 'Mei, Hanna, IT, Sally, Oracle, project manager, creative, developer, marketing, help, new project'
+        });
+
+        // Silent gather - Vesper listens without prompting
+        // (The greeting already asked how to direct the call)
+
+        // If no input after timeout, gently prompt
+        response.pause({ length: 5 });
+        await addSpeech(response, 'I\'m still here. Just let me know who you\'d like to speak with.', 'vesper', req);
+        response.redirect('/api/voice/incoming');
+    }
+
+    res.type('text/xml');
+    res.send(response.toString());
+}
+
+/**
+ * Route caller to selected agent
+ * POST /api/voice/route
+ */
+export async function handleRouteCall(req, res) {
+    const speechResult = req.body.SpeechResult;
+    const response = new VoiceResponse();
+
+    console.log(`[Voice] Speech received: "${speechResult}"`);
+
+    // Handle empty speech/timeout
+    if (!speechResult) {
+        await addSpeech(response, "I didn't hear anything. Are you still there?", 'vesper', req);
+        response.redirect('/api/voice/incoming');
+        res.type('text/xml');
+        return res.send(response.toString());
+    }
+
+    // Use Vesper to detect intent (matches keywords against virtual_office.json)
+    const intent = await vesper.detectIntent(speechResult);
+
+    if (!intent.agentId) {
+        // Didn't understand, ask again
+        await addSpeech(response, "I didn't quite catch that, sweetie. Could you say that again?", 'vesper', req);
+
+        const gather = response.gather({
+            input: 'speech',
+            action: '/api/voice/route',
+            method: 'POST',
+            speechTimeout: 'auto',
+            hints: 'Mei, Hanna, IT, Sally, Oracle'
+        });
+
+        gather.say({
+            voice: 'Polly.Joanna'
+        }, 'Who did you want to talk to?');
+
+        res.type('text/xml');
+        return res.send(response.toString());
+    }
+
+    // Get agent info
+    const agent = intent.agent;
+
+    // Vesper transfers (with intelligence about WHY)
+    // "Connecting you to Hanna... she's the creative one."
+    await addSpeech(response, `Connecting you to ${agent.name}... One moment calling...`, 'vesper', req);
+
+    response.pause({ length: 1 });
+
+    // Redirect to agent conversation
+    response.redirect({
+        method: 'POST'
+    }, `/api/voice/agent/${agent.id}`);
+
+    res.type('text/xml');
+    res.send(response.toString());
+}
+
+/**
+ * Conversation with a specific agent
+ * POST /api/voice/agent/:agentId
+ */
+export async function handleAgentConversation(req, res) {
+    const { agentId } = req.params;
+    const speechResult = req.body.SpeechResult;
+    const response = new VoiceResponse();
+
+    const agent = getAgent(agentId);
+
+    // If this is the first message to agent, give their greeting
+    if (!speechResult) {
+        const greeting = getAgentGreeting(agentId);
+        await addSpeech(response, greeting, agentId, req);
+    } else {
+        // Process their message through the agent
+        console.log(`[Voice:${agentId}] User said: "${speechResult}"`);
+
+        // Log input to Bus (Async - fire and forget, don't block voice loop)
+        const taskId = `voice-${Date.now()}`; // Short-lived task ID for the call segment
+        eventBus.emit('bus_message', {
+            type: 'VOICE_INPUT',
+            agentId: 'user', // "User" via Phone
+            taskId,
+            content: speechResult,
+            timestamp: new Date().toISOString()
+        });
+
+        try {
+            // NO FALLBACK - always use LLM
+            if (!isLlmAvailable()) {
+                throw new Error('No LLM provider available');
+            }
+            const agentResponse = await agent.process(speechResult);
+
+            // Log output to Bus
+            eventBus.emit('bus_message', {
+                type: 'VOICE_OUTPUT',
+                agentId,
+                taskId,
+                content: agentResponse,
+                timestamp: new Date().toISOString()
+            });
+
+            // Speak the agent's response with their ElevenLabs voice
+            await addSpeech(response, agentResponse, agentId, req);
+
+        } catch (err) {
+            console.error(`[Voice:${agentId}] Error:`, err);
+            await addSpeech(response, "I'm having trouble thinking right now. My brain circuits are offline. Please try again later.", agentId, req);
+        }
+    }
+
+    // Continue the conversation
+    const gather = response.gather({
+        input: 'speech',
+        action: `/api/voice/agent/${agentId}`,
+        method: 'POST',
+        speechTimeout: 'auto',
+        language: 'en-US'
+    });
+
+    // If they don't say anything, end call gracefully (using Polly for inline)
+    response.say({
+        voice: POLLY_VOICES[agentId] || 'Polly.Joanna'
+    }, "Are you still there?");
+
+    response.redirect(`/api/voice/agent/${agentId}`);
+
+    res.type('text/xml');
+    res.send(response.toString());
+}
+
+/**
+ * Get agent greeting for phone
+ */
+function getAgentGreeting(agentId) {
+    return AGENT_GREETINGS[agentId] || AGENT_GREETINGS.default;
+}
+
+// getAgentFallback REMOVED - no more mock/fallback responses
+
+// ==========================================
+// CONFERENCE LOOP "The Meeting"
+// ==========================================
+
+/**
+ * Handle Conference Loop
+ * 1. Post user input to Bus (from previous turn)
+ * 2. Read NEW agent messages
+ * 3. Loop back
+ */
+export async function handleConference(req, res) {
+    const response = new VoiceResponse();
+    const speechResult = req.body.SpeechResult;
+    const lastRead = parseInt(req.query.lastRead || '0');
+
+    // Import dynamically to avoid circular deps
+    const { BusOps, getTaskContext, getTaskTranscript } = await import('./bus.js');
+
+    try {
+        // 1. Post User Input to Bus
+        if (speechResult) {
+            console.log(`[Conference] User said: "${speechResult}"`);
+
+            // We use a dedicated task for the "Meeting Room"
+            const CONFERENCE_TASK_ID = 'task_conference_room';
+
+            eventBus.emit('bus_message', {
+                type: 'voice_input',
+                agentId: 'user_voice',
+                content: speechResult,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // 2. Read NEW Messages from Bus (since lastRead)
+        // Check active tasks for recent output
+        // For simple MVP: Just acknowledge.
+        // "I heard you."
+        // In full version, we'd read back new messages.
+
+    } catch (err) {
+        console.error('[Conference] Error:', err);
+        response.say("Connection glitch. Re-establishing.");
+    }
+
+    // 3. Loop Listen
+    const gather = response.gather({
+        input: 'speech',
+        action: `/api/voice/conference?lastRead=${Date.now()}`,
+        method: 'POST',
+        speechTimeout: 'auto', // Smart timeout
+        timeout: 2 // Wait 2s for start
+    });
+
+    // Default prompt if nothing was said
+    gather.say({ voice: 'Polly.Joanna' }, "I'm listening.");
+
+    // If no input, loop
+    response.redirect(`/api/voice/conference?lastRead=${lastRead}`);
+
+    res.type('text/xml');
+    res.send(response.toString());
+}

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "generatedAt": "2026-01-04T22:20:21.529746Z",
+  "note": "Bootstrap map for Mei hard requirement. Oracle/Mei autonomy should replace.",
+  "agents": {
+    "oracle": {
+      "roles": [
+        "oracle"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529648Z"
+    },
+    "mei": {
+      "roles": [
+        "mei"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529658Z"
+    },
+    "creative": {
+      "roles": [
+        "creative"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529661Z"
+    },
+    "researcher": {
+      "roles": [
+        "researcher"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529667Z"
+    },
+    "developer": {
+      "roles": [
+        "developer"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529671Z"
+    },
+    "analyst": {
+      "roles": [
+        "analyst"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529674Z"
+    },
+    "strategist": {
+      "roles": [
+        "strategist"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529677Z"
+    },
+    "automator": {
+      "roles": [
+        "automator"
+      ],
+      "keywords": {},
+      "updatedAt": "2026-01-04T22:20:21.529683Z"
+    }
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "updatedAt": "2026-01-04T22:48:01.157714Z",
+  "oracle": {
+    "youtubeLookbackDays": 30,
+    "pollMinutesDefault": 60,
+    "maxNuggetsPerSourceItem": 5,
+    "maxNuggetsPerAgentPerDay": 20,
+    "knowledgeHalfLifeDays": 14,
+    "pushlogRetentionDays": 180
+  },
+  "curriculumMap": {
+    "mei": {
+      "description": "Flow + management patterns only",
+      "topics": [
+        "delegation",
+        "verification",
+        "workflow",
+        "planning",
+        "risk"
+      ]
+    },
+    "glitch": {
+      "description": "Implementation + refactors",
+      "topics": [
+        "node",
+        "react",
+        "api",
+        "redis",
+        "testing",
+        "architecture",
+        "performance"
+      ]
+    },
+    "qc": {
+      "description": "Verification + tests + evidence discipline",
+      "topics": [
+        "testing",
+        "verification",
+        "evidence",
+        "security",
+        "lint",
+        "ci"
+      ]
+    },
+    "it": {
+      "description": "Infra + Railway + deploy",
+      "topics": [
+        "railway",
+        "deploy",
+        "redis",
+        "env",
+        "observability",
+        "ops"
+      ]
+    },
+    "hanna": {
+      "description": "UI/UX style and componentry",
+      "topics": [
+        "ui",
+        "ux",
+        "design",
+        "accessibility",
+        "copy"
+      ]
+    }
+  },
+  "routingKeywords": {
+    "whoDoesWhat": {
+      "mei": [
+        "manager",
+        "orchestrate",
+        "split",
+        "assign",
+        "merge",
+        "plan"
+      ],
+      "glitch": [
+        "code",
+        "implement",
+        "refactor",
+        "node",
+        "react",
+        "api"
+      ],
+      "qc": [
+        "verify",
+        "test",
+        "lint",
+        "audit",
+        "evidence"
+      ],
+      "it": [
+        "deploy",
+        "railway",
+        "redis",
+        "ops",
+        "env"
+      ],
+      "hanna": [
+        "ui",
+        "ux",
+        "design",
+        "layout",
+        "copy"
+      ]
+    },
+    "whoGetsWhat": {
+      "delegation": [
+        "mei"
+      ],
+      "verification": [
+        "mei",
+        "qc"
+      ],
+      "workflow": [
+        "mei"
+      ],
+      "react": [
+        "glitch",
+        "hanna",
+        "qc"
+      ],
+      "node": [
+        "glitch",
+        "qc"
+      ],
+      "redis": [
+        "it",
+        "glitch",
+        "qc"
+      ],
+      "railway": [
+        "it",
+        "mei"
+      ]
+    }
+  },
+  "llmBackends": [
+    {
+      "id": "openai:gpt-5.2",
+      "provider": "openai",
+      "model": "gpt-5.2",
+      "maxTokens": 2048,
+      "temperature": 0.2
+    },
+    {
+      "id": "anthropic:claude-sonnet-4-20250514",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "maxTokens": 2048,
+      "temperature": 0.2
+    },
+    {
+      "id": "google:gemini-2.0-pro",
+      "provider": "google",
+      "model": "gemini-2.0-pro",
+      "maxTokens": 2048,
+      "temperature": 0.2
+    },
+    {
+      "id": "openrouter:deepseek-r1",
+      "provider": "openrouter",
+      "model": "deepseek-r1",
+      "maxTokens": 2048,
+      "temperature": 0.2
+    },
+    {
+      "id": "nvidia:nemotron-4-340b",
+      "provider": "nvidia",
+      "model": "nemotron-4-340b",
+      "maxTokens": 2048,
+      "temperature": 0.2
+    }
+  ]
+}

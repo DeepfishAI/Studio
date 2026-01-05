@@ -16,6 +16,7 @@ import CheckoutCanceledPage from './pages/CheckoutCanceledPage'
 import WorkspacePage from './pages/WorkspacePage'
 import TogglesPage from './pages/TogglesPage'
 import StorePage from './pages/StorePage'
+import ServerRoomPage from './pages/ServerRoomPage'
 // import GodModePage from './pages/GodModePage' // Temporarily disabled due to build error
 import AdminPage from './pages/AdminPage'
 
@@ -88,6 +89,7 @@ function AppRoutes() {
                 <Route path="pricing" element={<PricingPage />} />
                 <Route path="billing" element={<BillingPage />} />
                 <Route path="workspace" element={<WorkspacePage />} />
+                <Route path="server-room" element={<ServerRoomPage />} />
                 <Route path="toggles" element={<TogglesPage />} />
                 <Route path="store" element={<StorePage />} />
                 {/* <Route path="god" element={<GodModePage />} /> */}

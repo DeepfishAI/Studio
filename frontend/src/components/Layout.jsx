@@ -111,6 +111,13 @@ function Layout() {
                             <span>Workspace</span>
                         </Link>
                         <Link
+                            to="/app/server-room"
+                            className={`sidebar__nav-item ${isActive('/app/server-room') ? 'sidebar__nav-item--active' : ''}`}
+                        >
+                            <span>🎞️</span>
+                            <span>Server Room</span>
+                        </Link>
+                        <Link
                             to="/app/toggles"
                             className={`sidebar__nav-item ${isActive('/app/toggles') ? 'sidebar__nav-item--active' : ''}`}
                         >

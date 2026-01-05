@@ -122,6 +122,7 @@ import voiceRoutes from './routes/voice.js';
 import trainingRoutes from './routes/training.js';
 import { godRoutes } from './routes/god.js';
 import authRoutes from './routes/auth.js';
+import filesRoutes from './routes/files.js';
 
 // ... (Redis setup)
 
@@ -572,6 +573,9 @@ app.get('/api/projects', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch projects' });
     }
 });
+
+// File Management Routes (Server Room)
+app.use('/api/files', filesRoutes);
 
 // Create HTTP server for WebSocket upgrade
 const server = createServer(app);

@@ -11,7 +11,7 @@
 
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import crypto from 'crypto';
 
 const router = express.Router();
@@ -30,31 +30,22 @@ const rateLimit = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const MAX_REQUESTS = 3;
 
-// Email transporter (lazy init)
-let transporter = null;
+// Resend email client (lazy init)
+let resendClient = null;
 
-function getTransporter() {
-    if (transporter) return transporter;
+function getResendClient() {
+    if (resendClient) return resendClient;
 
-    const emailUser = process.env.EMAIL_USER;
-    const emailPass = process.env.EMAIL_PASSWORD;
+    const apiKey = process.env.RESEND_API_KEY;
 
-    if (!emailUser || !emailPass) {
-        console.warn('[Auth] Email not configured - codes will be logged to console');
+    if (!apiKey) {
+        console.warn('[Auth] RESEND_API_KEY not configured - codes will be logged to console only');
         return null;
     }
 
-    transporter = nodemailer.createTransport({
-        host: process.env.EMAIL_SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.EMAIL_SMTP_PORT || '465'),
-        secure: true,
-        auth: {
-            user: emailUser,
-            pass: emailPass
-        }
-    });
-
-    return transporter;
+    resendClient = new Resend(apiKey);
+    console.log('[Auth] ✅ Resend email service configured');
+    return resendClient;
 }
 
 function generateCode() {
@@ -130,13 +121,13 @@ router.post('/request-code', async (req, res) => {
         });
 
         // Try to send email
-        const transport = getTransporter();
+        const resend = getResendClient();
 
-        if (transport) {
+        if (resend) {
             try {
-                await transport.sendMail({
-                    from: process.env.EMAIL_FROM || 'DeepFish <noreply@deepfish.app>',
-                    to: normalizedEmail,
+                await resend.emails.send({
+                    from: 'DeepFish <onboarding@resend.dev>', // Use your verified domain or resend.dev
+                    to: [normalizedEmail],
                     subject: 'Your DeepFish Login Code',
                     html: `
                         <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
@@ -150,7 +141,7 @@ router.post('/request-code', async (req, res) => {
                         </div>
                     `
                 });
-                console.log(`[Auth] Verification code sent to ${normalizedEmail}`);
+                console.log(`[Auth] ✅ Verification code sent to ${normalizedEmail}`);
             } catch (emailErr) {
                 console.error('[Auth] Failed to send email:', emailErr.message);
                 // Fall through - still log code for testing

@@ -47,4 +47,10 @@ dist/
 oracle/receipts/*
 !oracle/receipts/.keep
 
+*.zip
+*.7z
+*.tar
+*.gz
+
+
 

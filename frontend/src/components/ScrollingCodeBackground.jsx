@@ -22,13 +22,13 @@ export default function ScrollingCodeBackground() {
     const [lines, setLines] = useState([]);
 
     useEffect(() => {
-        // Generate 5 random code lines with different speeds & colors
+        // Generate 9 random code lines with varied speeds for 3D effect (50% denser)
         const colors = ['#1E90FF', '#9B59B6', '#2ECC71', '#FF9F43', '#E74C99', '#00D4FF'];
-        const newLines = Array.from({ length: 6 }, (_, i) => ({
+        const newLines = Array.from({ length: 9 }, (_, i) => ({
             id: i,
             code: codeSnippets[Math.floor(Math.random() * codeSnippets.length)],
             color: colors[i % colors.length],
-            duration: 40 + i * 10, // Stagger speeds: 40s, 50s, 60s, etc.
+            duration: 30 + i * 7, // More varied speeds: 30s, 37s, 44s... 86s (3D effect)
             delay: i * -8 // Stagger start positions
         }));
         setLines(newLines);
@@ -44,14 +44,14 @@ export default function ScrollingCodeBackground() {
             overflow: 'hidden',
             pointerEvents: 'none',
             zIndex: 0,
-            opacity: 0.15
+            opacity: 0.18
         }}>
             {lines.map(line => (
                 <div
                     key={line.id}
                     style={{
                         position: 'absolute',
-                        top: `${20 + line.id * 18}%`,
+                        top: `${15 + line.id * 10}%`,
                         whiteSpace: 'nowrap',
                         fontFamily: 'Consolas, "Courier New", monospace',
                         fontSize: '14px',

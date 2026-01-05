@@ -124,7 +124,7 @@
         "prompt": {
             "mcp_primitive": true,
             "what": "Templated message/workflow",
-            "example": "task-dispatch (route user request to agent)",
+            "example": "taREDACTED_API_KEY (route user request to agent)",
             "defined_in": "virtual_office.json → prompts[]"
         },
         "$comment_custom": "--- CUSTOM CONCEPTS (Our extensions, prefixed with _ in config) ---",
@@ -193,7 +193,7 @@
             "hierarchy": {
                 "A": "Officers only — triage, bus access, override capabilities",
                 "B": "Managers — specialized domain skills",
-                "C": "Interns — task-specific skills",
+                "C": "Interns — taREDACTED_API_KEY skills",
                 "D": "Basic — anyone can use (e.g., get_time, lookup)"
             },
             "current_skills": {

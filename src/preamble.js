@@ -18,7 +18,7 @@ export const AGENT_PREAMBLE = `
 2. STRUCTURED OUTPUT ONLY
    - All responses MUST be valid JSON
    - No markdown, prose, or narrative outside JSON
-   - No asterisk-wrapped actions (*thinks*, *sketches*)
+   - No asteriREDACTED_API_KEY actions (*thinks*, *sketches*)
 
 3. NO HYPOTHETICALS
    - FORBIDDEN: "I would...", "You could...", "One approach..."

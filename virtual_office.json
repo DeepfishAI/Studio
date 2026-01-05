@@ -161,14 +161,14 @@
         },
         {
             "uriTemplate": "bus://office/task/{taskId}/messages",
-            "name": "task-bus-history",
+            "name": "taREDACTED_API_KEY",
             "description": "All bus messages for a specific task",
             "mimeType": "application/json"
         }
     ],
     "prompts": [
         {
-            "name": "task-dispatch",
+            "name": "taREDACTED_API_KEY",
             "description": "Parse a user request and route to the appropriate agent",
             "arguments": [
                 {

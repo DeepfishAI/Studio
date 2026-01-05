@@ -135,7 +135,7 @@
         {
             "pattern": "\\*[^*]+\\*",
             "type": "regex",
-            "description": "Asterisk-wrapped actions"
+            "description": "AsteriREDACTED_API_KEY actions"
         },
         {
             "pattern": "TODO:",

@@ -555,5 +555,5 @@ server.listen(PORT, () => {
     const anthropicKey = getApiKey('anthropic');
     console.log(`🤖 LLM Available: ${llmAvailable ? 'YES' : 'NO'}`);
     console.log(`🤖 Providers: ${providers.length > 0 ? providers.join(', ') : 'NONE'}`);
-    console.log(`🔑 Anthropic Key: ${anthropicKey ? 'sk-ant-*****' : 'NOT SET'}`);
+    console.log(`🔑 Anthropic Key: ${anthropicKey ? 'REDACTED_API_KEY*****' : 'NOT SET'}`);
 });

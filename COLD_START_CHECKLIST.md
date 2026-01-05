@@ -5,7 +5,7 @@
 
 | # | System | Env Variable | Check Command | Status |
 |---|--------|-------------|---------------|--------|
-| 1 | **Anthropic Claude** | `ANTHROPIC_API_KEY` | Key starts with `sk-ant-` | ☐ |
+| 1 | **Anthropic Claude** | `ANTHROPIC_API_KEY` | Key starts with `REDACTED_API_KEY` | ☐ |
 | 2 | **Google Gemini** | `GEMINI_API_KEY` | Key starts with `AIzaSy` | ☐ |
 | 3 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Key starts with `nvapi-` | ☐ |
 | 4 | **ElevenLabs Voice** | `ELEVENLABS_API_KEY` | *(Optional - disabled for now)* | ☐ |
@@ -59,7 +59,7 @@ npm run server
 🔊 ElevenLabs Voice: ENABLED/DISABLED
 🤖 LLM Available: YES          ← CRITICAL
 🤖 Providers: anthropic, gemini, nvidia
-🔑 Anthropic Key: sk-ant-api...
+🔑 Anthropic Key: REDACTED_API_KEY...
 ```
 
 ### ❌ RED FLAGS:
@@ -88,7 +88,7 @@ VITE ready at http://localhost:5173
 
 ### Environment Variables Required:
 ```
-ANTHROPIC_API_KEY=sk-ant-api03-...
+ANTHROPIC_API_KEY=REDACTED_API_KEY...
 GEMINI_API_KEY=AIzaSyBf9q...
 NVIDIA_API_KEY=nvapi-OMMElv...
 NODE_ENV=production

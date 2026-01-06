@@ -23,7 +23,7 @@ let config = null;
 const isRailway = () => !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_PROJECT_ID;
 
 // Runtime-managed keys (God Mode)
-import { getProviderKey, isProviderEnabledRuntime } from '../infra/provider_keys.js';
+import { getProviderKey, isProviderEnabledRuntime, setProviderKey } from '../infra/provider_keys.js';
 
 export function loadConfig() {
     if (config) return config;
@@ -85,40 +85,71 @@ export function loadConfig() {
             const content = readFileSync(secretsPath, 'utf-8');
             const secrets = JSON.parse(content);
 
-            // Merge secrets into config (secrets override empty env vars)
-            if (secrets.llm_providers?.anthropic?.api_key && !config.llm_providers.anthropic.api_key) {
-                config.llm_providers.anthropic.api_key = secrets.llm_providers.anthropic.api_key;
+            // Merge secrets into config
+            // Handle nested structure (Legacy) OR Flat structure (Railway JSON export)
+
+
+            // Anthropic
+            const anthropicKey = secrets.llm_providers?.anthropic?.api_key || secrets.ANTHROPIC_API_KEY;
+            if (anthropicKey) { // Hydrate Cache
+                setProviderKey('anthropic', anthropicKey);
+                config.llm_providers.anthropic.api_key = anthropicKey;
                 config.llm_providers.anthropic.enabled = true;
             }
-            if (secrets.llm_providers?.google?.gemini_api_key && !config.llm_providers.google.gemini_api_key) {
-                config.llm_providers.google.gemini_api_key = secrets.llm_providers.google.gemini_api_key;
+
+            // Google / Gemini
+            const geminiKey = secrets.llm_providers?.google?.gemini_api_key || secrets.GEMINI_API_KEY || secrets.GOOGLE_AI_API_KEY;
+            if (geminiKey) { // Hydrate Cache
+                setProviderKey('gemini', geminiKey);
+                config.llm_providers.google.gemini_api_key = geminiKey;
                 config.llm_providers.google.enabled = true;
             }
-            if (secrets.llm_providers?.nvidia?.api_key && !config.llm_providers.nvidia.api_key) {
-                config.llm_providers.nvidia.api_key = secrets.llm_providers.nvidia.api_key;
+
+            // NVIDIA
+            const nvidiaKey = secrets.llm_providers?.nvidia?.api_key || secrets.NVIDIA_API_KEY;
+            if (nvidiaKey) { // Hydrate Cache
+                setProviderKey('nvidia', nvidiaKey);
+                config.llm_providers.nvidia.api_key = nvidiaKey;
                 config.llm_providers.nvidia.enabled = true;
             }
-            if (secrets.llm_providers?.openrouter?.api_key && !config.llm_providers.openrouter.api_key) {
-                config.llm_providers.openrouter.api_key = secrets.llm_providers.openrouter.api_key;
+
+            // OpenRouter
+            const openrouterKey = secrets.llm_providers?.openrouter?.api_key || secrets.OPENROUTER_API_KEY;
+            if (openrouterKey) { // Hydrate Cache
+                setProviderKey('openrouter', openrouterKey);
+                config.llm_providers.openrouter.api_key = openrouterKey;
                 config.llm_providers.openrouter.enabled = true;
             }
 
+            // OpenAI
+            const openaiKey = secrets.llm_providers?.openai?.api_key || secrets.OPENAI_API_KEY;
+            if (openaiKey) { // Hydrate Cache
+                setProviderKey('openai', openaiKey);
+                config.llm_providers.openai.api_key = openaiKey;
+                config.llm_providers.openai.enabled = true;
+            }
+
             // Twilio
-            if (secrets.twilio?.account_sid && !config.twilio.account_sid) {
-                config.twilio.account_sid = secrets.twilio.account_sid;
-                config.twilio.auth_token = secrets.twilio.auth_token || '';
-                config.twilio.phone_number = secrets.twilio.phone_number || '';
+            const twilioSid = secrets.twilio?.account_sid || secrets.TWILIO_ACCOUNT_SID;
+            if (twilioSid && !config.twilio.account_sid) {
+                config.twilio.account_sid = twilioSid;
+                config.twilio.auth_token = secrets.twilio?.auth_token || secrets.TWILIO_AUTH_TOKEN || '';
+                config.twilio.phone_number = secrets.twilio?.phone_number || secrets.TWILIO_PHONE_NUMBER || '';
                 config.twilio.enabled = true;
             }
 
             // ElevenLabs
-            if (secrets.elevenlabs?.api_key && !config.elevenlabs.api_key) {
-                config.elevenlabs.api_key = secrets.elevenlabs.api_key;
+            const elevenKey = secrets.elevenlabs?.api_key || secrets.ELEVENLABS_API_KEY;
+            if (elevenKey && !config.elevenlabs.api_key) {
+                config.elevenlabs.api_key = elevenKey;
                 config.elevenlabs.enabled = true;
             }
 
             if (secrets.redis_url && !config.redis_url) {
                 config.redis_url = secrets.redis_url;
+            }
+            if (secrets.REDIS_URL && !config.redis_url) {
+                config.redis_url = secrets.REDIS_URL;
             }
             if (secrets.tier) {
                 config.tier = secrets.tier;

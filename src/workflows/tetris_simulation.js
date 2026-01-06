@@ -1,6 +1,6 @@
 
-import { getAgent } from '../agent.js';
-import { tools } from '../tools/fs.js';
+import { getAgent } from '../domain/agent.js';
+import { tools } from '../domain/tools/fs.js';
 
 // Helper to delay for dramatic effect
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));

@@ -6,7 +6,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { getAgent } from '../agent.js';
+import { getAgent } from '../domain/agent.js';
 
 // Configuration
 const SCORE_THRESHOLD = 90;

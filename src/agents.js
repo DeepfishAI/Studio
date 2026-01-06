@@ -9,7 +9,7 @@
  *   const soraSkin = await createAgent('hanna', 'sora');
  */
 
-import { loadAgent, listAgents, getAgentSkins, clearAgentCache } from './agentLoader.js';
+import { loadAgent, listAgents, getAgentSkins, clearAgentCache } from './domain/agentLoader.js';
 
 /**
  * Create an agent by ID with optional skin

@@ -329,9 +329,9 @@ export class Vesper {
      * Process input when in "general" mode (Vesper routing)
      */
     async processGeneralRequest(input, c = null) {
+        // 1. Try rigid keyword routing first (fast path)
         const intent = await this.detectIntent(input, c);
-
-        if (intent.agentId) {
+        if (intent.agentId && intent.confidence === 'high') {
             // FIRE EVENT TO BUS - "I am transferring this call"
             eventBus.emit('bus_message', {
                 type: 'ROUTE_CALL',
@@ -352,7 +352,53 @@ export class Vesper {
                 `Transferring you now...`;
         }
 
-        // No clear intent - ask for clarification
+        // 2. If no keywords, ASK THE LLM (Vesper's brain)
+        if (isLlmAvailable()) {
+            try {
+                // Add routing tools context to prompt
+                const agentList = this.availableAgents.map(a => `- ${a.name} (${a.title}): ${a.id}`).join('\n');
+                const routingContext = `
+Available Agents:
+${agentList}
+
+INSTRUCTIONS:
+- You are Vesper, the receptionist.
+- Analyze the user's request: "${input}"
+- If the request matches a specific agent's expertise, route it by outputting: [[ROUTE: agent_id | reason]]
+- If the request is a general greeting or chat, respond in character (bored, flirty, efficient).
+- If you are unsure, ask for clarification.
+`;
+                const response = await chat(this.systemPrompt, routingContext, { maxTokens: 256 });
+
+                // Parse decision
+                const routeMatch = response.match(/\[\[ROUTE:\s*(.+?)\s*\|\s*(.+?)\]\]/i);
+                if (routeMatch) {
+                    const agentId = routeMatch[1].trim();
+                    const reason = routeMatch[2].trim();
+                    const agent = this.getAgentInfo(agentId);
+
+                    eventBus.emit('bus_message', {
+                        type: 'ROUTE_CALL',
+                        sender: 'vesper',
+                        target: agentId,
+                        content: input,
+                        reason: reason,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    return `(Checking schedule...) Oh, you want ${agent?.name || agentId}. ${reason}. Sending you through.`;
+                }
+
+                // Just chat
+                return response;
+
+            } catch (err) {
+                console.error('[Vesper] Brain freeze:', err);
+                // Fall through to fallback
+            }
+        }
+
+        // 3. Fallback if LLM fails
         if (c) {
             return `${c.text('I am not sure who can help with that.')}\n\n` +
                 `${c.dim('Could you be more specific? Or just pick from the list:')}` +
